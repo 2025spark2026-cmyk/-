@@ -51,7 +51,9 @@ class _DetailPageState extends State<DetailPage> {
           }
 
           final data = snapshot.data!.data() ?? {};
-          final comments = List<Map<String, dynamic>>.from(data['comments'] ?? []);
+          final comments = List<Map<String, dynamic>>.from(
+            data['comments'] ?? [],
+          );
           final likedBy = List<String>.from(data['likedBy'] ?? []);
           final userId = SessionService.currentUserId;
           final liked = userId != null && likedBy.contains(userId);
@@ -74,7 +76,10 @@ class _DetailPageState extends State<DetailPage> {
                     const SizedBox(height: 6),
                     Text(
                       data['title'] ?? '',
-                      style: TextStyle(fontSize: 27, fontWeight: FontWeight.w900),
+                      style: TextStyle(
+                        fontSize: 27,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                     const SizedBox(height: 10),
                     Text(
@@ -85,7 +90,10 @@ class _DetailPageState extends State<DetailPage> {
                     if ((data['imageUrl'] ?? '').toString().isNotEmpty) ...[
                       ClipRRect(
                         borderRadius: BorderRadius.circular(16),
-                        child: Image.network(data['imageUrl'], fit: BoxFit.cover),
+                        child: Image.network(
+                          data['imageUrl'],
+                          fit: BoxFit.cover,
+                        ),
                       ),
                       const SizedBox(height: 22),
                     ],
@@ -99,16 +107,26 @@ class _DetailPageState extends State<DetailPage> {
                         OutlinedButton.icon(
                           onPressed: userId == null
                               ? null
-                              : () => _board.toggleLike(postId: widget.postId, userId: userId),
-                          icon: Icon(liked ? Icons.favorite : Icons.favorite_border_rounded),
-                          label: Text('${data['좋아요'] ?? 0}'),
+                              : () => _board.toggleLike(
+                                  postId: widget.postId,
+                                  userId: userId,
+                                ),
+                          icon: Icon(
+                            liked
+                                ? Icons.favorite
+                                : Icons.favorite_border_rounded,
+                          ),
+                          label: Text('${data['likes'] ?? 0}'),
                         ),
                       ],
                     ),
                     const Divider(height: 38),
                     Text(
                       '댓글 ${comments.length}',
-                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 18,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     for (final comment in comments)
@@ -120,7 +138,11 @@ class _DetailPageState extends State<DetailPage> {
                             const CircleAvatar(
                               radius: 16,
                               backgroundColor: Color(0xFFF1F1F1),
-                              child: Icon(Icons.person, size: 18, color: AppTheme.muted),
+                              child: Icon(
+                                Icons.person,
+                                size: 18,
+                                color: AppTheme.muted,
+                              ),
                             ),
                             const SizedBox(width: 10),
                             Expanded(
