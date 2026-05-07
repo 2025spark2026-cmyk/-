@@ -1,5 +1,8 @@
 name: Android Build
 
+permissions:
+  contents: write
+
 on:
   push:
     branches:
@@ -22,16 +25,12 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: 3.41.6
+          flutter-version: 3.29.0
 
       - run: flutter pub get
 
       - run: flutter build apk --release
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: app-release
-          path: build/app/outputs/flutter-apk/app-release.apk
       - name: Create Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
