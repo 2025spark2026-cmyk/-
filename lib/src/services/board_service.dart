@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 
 class BoardService {
   BoardService({FirebaseFirestore? firestore, FirebaseStorage? storage})
@@ -15,10 +17,10 @@ class BoardService {
       _firestore.collection('posts');
 
   Stream<QuerySnapshot<Map<String, dynamic>>> watchPosts() {
-    return _posts.orderBy('isNotice', descending: true).orderBy(
-      'timestamp',
-      descending: true,
-    ).snapshots();
+    return _posts
+        .orderBy('isNotice', descending: true)
+        .orderBy('timestamp', descending: true)
+        .snapshots();
   }
 
   Stream<DocumentSnapshot<Map<String, dynamic>>> watchPost(String id) {
@@ -41,12 +43,20 @@ class BoardService {
     required bool anonymous,
     required bool notice,
     File? image,
+    Uint8List? webImage,
   }) async {
     var imageUrl = '';
-    if (image != null) {
+    if (image != null || webImage != null) {
       final path = 'posts/${DateTime.now().millisecondsSinceEpoch}.jpg';
       final ref = _storage.ref(path);
-      await ref.putFile(image, SettableMetadata(contentType: 'image/jpeg'));
+      if (kIsWeb && webImage != null) {
+        await ref.putData(
+          webImage,
+          SettableMetadata(contentType: 'image/jpeg'),
+        );
+      } else if (image != null) {
+        await ref.putFile(image, SettableMetadata(contentType: 'image/jpeg'));
+      }
       imageUrl = await ref.getDownloadURL();
     }
 
@@ -72,16 +82,15 @@ class BoardService {
   }) {
     return _posts.doc(postId).update({
       'comments': FieldValue.arrayUnion([
-        {
-          'author': author,
-          'text': text,
-          'createdAt': Timestamp.now(),
-        },
+        {'author': author, 'text': text, 'createdAt': Timestamp.now()},
       ]),
     });
   }
 
-  Future<void> toggleLike({required String postId, required String userId}) async {
+  Future<void> toggleLike({
+    required String postId,
+    required String userId,
+  }) async {
     final doc = await _posts.doc(postId).get();
     final data = doc.data() ?? {};
     final likedBy = List<String>.from(data['likedBy'] ?? []);

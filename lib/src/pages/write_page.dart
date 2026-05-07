@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:central_festival_app/src/pages/detail_page.dart';
 import 'package:central_festival_app/src/services/board_service.dart';
@@ -6,6 +7,7 @@ import 'package:central_festival_app/src/services/session_service.dart';
 import 'package:central_festival_app/src/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter/foundation.dart';
 
 class WritePage extends StatefulWidget {
   const WritePage({super.key});
@@ -19,6 +21,7 @@ class _WritePageState extends State<WritePage> {
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
   File? _image;
+  Uint8List? _webImage;
   bool _anonymous = true;
   bool _notice = false;
   bool _submitting = false;
@@ -36,7 +39,19 @@ class _WritePageState extends State<WritePage> {
       imageQuality: 75,
       maxWidth: 1800,
     );
-    if (picked != null) setState(() => _image = File(picked.path));
+
+    if (picked == null) return;
+
+    if (kIsWeb) {
+      final bytes = await picked.readAsBytes();
+      setState(() {
+        _webImage = bytes;
+      });
+    } else {
+      setState(() {
+        _image = File(picked.path);
+      });
+    }
   }
 
   Future<void> _submit() async {
@@ -127,7 +142,7 @@ class _WritePageState extends State<WritePage> {
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: AppTheme.line),
               ),
-              child: _image == null
+              child: (_image == null && _webImage == null)
                   ? const Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -142,7 +157,9 @@ class _WritePageState extends State<WritePage> {
                     )
                   : ClipRRect(
                       borderRadius: BorderRadius.circular(14),
-                      child: Image.file(_image!, fit: BoxFit.cover),
+                      child: kIsWeb
+                          ? Image.memory(_webImage!, fit: BoxFit.cover)
+                          : Image.file(_image!, fit: BoxFit.cover),
                     ),
             ),
           ),
