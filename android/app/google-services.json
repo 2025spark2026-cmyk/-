@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "456373103467",
+    "project_id": "test1-8b353",
+    "storage_bucket": "test1-8b353.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:456373103467:android:59abb1c8783b1e7afefa2e",
+        "android_client_info": {
+          "package_name": "com.centralfestival.central_festival_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCo8u-0u86oXTpds_y_vRuU9Xq_Kfl2b3A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
