@@ -3,17 +3,22 @@ import 'package:flutter/material.dart';
 
 class AppTheme {
   static const crimson = Color(0xFF891B14);
+  static const gold = Color(0xFFE5B94C);
+  static const teal = Color(0xFF2F8F83);
   static const ink = Color(0xFF171717);
   static const muted = Color(0xFF737373);
-  static const surface = Color(0xFFF7F7F8);
-  static const line = Color(0xFFE7E5E4);
+  static const surface = Color(0xFFFFF7EE);
+  static const panel = Color(0xFFFFFCF7);
+  static const line = Color(0xFFE9D9C8);
 
   static ThemeData get light {
     final scheme = ColorScheme.fromSeed(
       seedColor: crimson,
       brightness: Brightness.light,
       primary: crimson,
-      surface: Colors.white,
+      secondary: gold,
+      tertiary: teal,
+      surface: panel,
     );
 
     return ThemeData(
@@ -21,20 +26,20 @@ class AppTheme {
       colorScheme: scheme,
       scaffoldBackgroundColor: surface,
       fontFamilyFallback: const ['Apple SD Gothic Neo', 'Noto Sans KR'],
-      appBarTheme: AppBarTheme(
+      appBarTheme: const AppBarTheme(
         centerTitle: true,
         elevation: 0,
         scrolledUnderElevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: ink,
+        backgroundColor: crimson,
+        foregroundColor: Colors.white,
         titleTextStyle: TextStyle(
-          color: ink,
+          color: Colors.white,
           fontSize: 18,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w900,
         ),
       ),
       cardTheme: CardThemeData(
-        color: Colors.white,
+        color: panel,
         elevation: 0,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
@@ -76,12 +81,12 @@ class AppTheme {
       ),
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.white,
+        backgroundColor: Color(0xFFFFFCF7),
         selectedItemColor: crimson,
         unselectedItemColor: muted,
         selectedLabelStyle: TextStyle(
           fontSize: 12,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w800,
         ),
         unselectedLabelStyle: TextStyle(fontSize: 12),
       ),

@@ -19,6 +19,8 @@ class _WritePageState extends State<WritePage> {
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
   Uint8List? _imageBytes;
+  String? _imageExtension;
+  String? _imageContentType;
   bool _anonymous = true;
   bool _notice = false;
   bool _submitting = false;
@@ -33,14 +35,18 @@ class _WritePageState extends State<WritePage> {
   Future<void> _pickImage() async {
     final picked = await ImagePicker().pickImage(
       source: ImageSource.gallery,
-      imageQuality: 75,
+      imageQuality: 78,
       maxWidth: 1800,
     );
     if (picked == null) return;
 
     final bytes = await picked.readAsBytes();
     if (!mounted) return;
-    setState(() => _imageBytes = bytes);
+    setState(() {
+      _imageBytes = bytes;
+      _imageExtension = _extensionFromName(picked.name);
+      _imageContentType = picked.mimeType;
+    });
   }
 
   Future<void> _submit() async {
@@ -61,6 +67,8 @@ class _WritePageState extends State<WritePage> {
         anonymous: _anonymous,
         notice: _notice,
         imageBytes: _imageBytes,
+        imageExtension: _imageExtension,
+        imageContentType: _imageContentType,
       );
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
@@ -80,6 +88,11 @@ class _WritePageState extends State<WritePage> {
       ..showSnackBar(SnackBar(content: Text(value)));
   }
 
+  String _extensionFromName(String name) {
+    final parts = name.split('.');
+    return parts.length > 1 ? parts.last : 'jpg';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -90,7 +103,10 @@ class _WritePageState extends State<WritePage> {
             onPressed: _submitting ? null : _submit,
             child: const Text(
               '게시',
-              style: TextStyle(fontWeight: FontWeight.w900),
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
         ],
@@ -129,9 +145,9 @@ class _WritePageState extends State<WritePage> {
             onTap: _pickImage,
             borderRadius: BorderRadius.circular(14),
             child: Container(
-              height: 172,
+              height: 190,
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppTheme.panel,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: AppTheme.line),
               ),
@@ -148,9 +164,27 @@ class _WritePageState extends State<WritePage> {
                         Text('사진 추가'),
                       ],
                     )
-                  : ClipRRect(
-                      borderRadius: BorderRadius.circular(14),
-                      child: Image.memory(_imageBytes!, fit: BoxFit.cover),
+                  : Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: Image.memory(_imageBytes!, fit: BoxFit.cover),
+                        ),
+                        Positioned(
+                          right: 8,
+                          top: 8,
+                          child: IconButton.filled(
+                            onPressed: () => setState(() {
+                              _imageBytes = null;
+                              _imageExtension = null;
+                              _imageContentType = null;
+                            }),
+                            icon: const Icon(Icons.close_rounded),
+                            tooltip: '사진 제거',
+                          ),
+                        ),
+                      ],
                     ),
             ),
           ),
@@ -160,6 +194,7 @@ class _WritePageState extends State<WritePage> {
               value: _notice,
               activeThumbColor: AppTheme.crimson,
               title: const Text('공지로 올리기'),
+              subtitle: const Text('공지 글은 일반 게시글과 인기게시물보다 먼저 표시됩니다.'),
               onChanged: (value) => setState(() {
                 _notice = value;
                 if (value) _anonymous = false;

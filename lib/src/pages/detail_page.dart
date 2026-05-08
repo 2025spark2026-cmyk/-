@@ -18,6 +18,7 @@ class _DetailPageState extends State<DetailPage> {
   final _board = BoardService();
   final _commentController = TextEditingController();
   bool _commenting = false;
+  bool _liking = false;
 
   @override
   void dispose() {
@@ -43,6 +44,27 @@ class _DetailPageState extends State<DetailPage> {
     }
   }
 
+  Future<void> _toggleLike({required bool liked}) async {
+    final userId = SessionService.currentUserId;
+    if (userId == null || _liking) return;
+
+    setState(() => _liking = true);
+    try {
+      await _board.toggleLike(
+        postId: widget.postId,
+        userId: userId,
+        currentlyLiked: liked,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text('좋아요를 반영하지 못했습니다: $e')));
+    } finally {
+      if (mounted) setState(() => _liking = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -65,6 +87,10 @@ class _DetailPageState extends State<DetailPage> {
           final likedBy = List<String>.from(data['likedBy'] ?? []);
           final userId = SessionService.currentUserId;
           final liked = userId != null && likedBy.contains(userId);
+          final likes = (data['likes'] as num?)?.toInt() ?? likedBy.length;
+          final isNotice = data['isNotice'] == true;
+          final isPopular =
+              !isNotice && likes >= BoardService.popularLikeThreshold;
           final timestamp = data['timestamp'];
 
           return Column(
@@ -73,15 +99,25 @@ class _DetailPageState extends State<DetailPage> {
                 child: ListView(
                   padding: const EdgeInsets.all(20),
                   children: [
-                    if (data['isNotice'] == true)
-                      const Text(
-                        '공지',
-                        style: TextStyle(
-                          color: AppTheme.crimson,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        if (isNotice)
+                          _Badge(
+                            icon: Icons.campaign_rounded,
+                            label: '공지',
+                            color: AppTheme.crimson,
+                          ),
+                        if (isPopular)
+                          const _Badge(
+                            icon: Icons.local_fire_department_rounded,
+                            label: '인기게시물',
+                            color: AppTheme.teal,
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
                     Text(
                       (data['title'] ?? '').toString(),
                       style: const TextStyle(
@@ -101,6 +137,7 @@ class _DetailPageState extends State<DetailPage> {
                         child: Image.network(
                           data['imageUrl'].toString(),
                           fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => const EmptyImageState(),
                         ),
                       ),
                       const SizedBox(height: 22),
@@ -113,18 +150,16 @@ class _DetailPageState extends State<DetailPage> {
                     Row(
                       children: [
                         OutlinedButton.icon(
-                          onPressed: userId == null
+                          onPressed: userId == null || _liking
                               ? null
-                              : () => _board.toggleLike(
-                                  postId: widget.postId,
-                                  userId: userId,
-                                ),
+                              : () => _toggleLike(liked: liked),
                           icon: Icon(
                             liked
                                 ? Icons.favorite
                                 : Icons.favorite_border_rounded,
+                            color: liked ? Colors.red : null,
                           ),
-                          label: Text('${data['likes'] ?? 0}'),
+                          label: Text('$likes'),
                         ),
                       ],
                     ),
@@ -180,7 +215,7 @@ class _DetailPageState extends State<DetailPage> {
                 child: Container(
                   padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
                   decoration: const BoxDecoration(
-                    color: Colors.white,
+                    color: AppTheme.panel,
                     border: Border(top: BorderSide(color: AppTheme.line)),
                   ),
                   child: Row(
@@ -223,5 +258,52 @@ class _DetailPageState extends State<DetailPage> {
   String _formatTime(dynamic value) {
     if (value is! Timestamp) return '';
     return DateFormat('M/d HH:mm').format(value.toDate());
+  }
+}
+
+class _Badge extends StatelessWidget {
+  const _Badge({required this.icon, required this.label, required this.color});
+
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(color: color, fontWeight: FontWeight.w900),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class EmptyImageState extends StatelessWidget {
+  const EmptyImageState({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 180,
+      color: const Color(0xFFF4ECE2),
+      alignment: Alignment.center,
+      child: const Text(
+        '이미지를 불러오지 못했습니다.',
+        style: TextStyle(color: AppTheme.muted),
+      ),
+    );
   }
 }

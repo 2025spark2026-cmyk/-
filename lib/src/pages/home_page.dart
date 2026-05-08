@@ -23,7 +23,7 @@ class _HomePageState extends State<HomePage> {
   final _schedule = ScheduleService();
   int _index = 0;
 
-  static const _titles = ['게시판', '지도', '프로필', '일정'];
+  static const _titles = ['게시판', '인기', '지도', '프로필', '일정'];
 
   @override
   void initState() {
@@ -82,15 +82,25 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(_titles[_index])),
-      body: PageView(
-        controller: _pageController,
-        onPageChanged: (value) => setState(() => _index = value),
-        children: [
-          _BoardTab(board: _board),
-          const _MapTab(),
-          const _ProfileTab(),
-          _ScheduleTab(schedule: _schedule),
-        ],
+      body: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFFFEBD6), AppTheme.surface],
+          ),
+        ),
+        child: PageView(
+          controller: _pageController,
+          onPageChanged: (value) => setState(() => _index = value),
+          children: [
+            _BoardTab(board: _board),
+            _PopularTab(board: _board),
+            const _MapTab(),
+            const _ProfileTab(),
+            _ScheduleTab(schedule: _schedule),
+          ],
+        ),
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _index,
@@ -100,6 +110,11 @@ class _HomePageState extends State<HomePage> {
             icon: Icon(Icons.forum_outlined),
             activeIcon: Icon(Icons.forum_rounded),
             label: '게시판',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.local_fire_department_outlined),
+            activeIcon: Icon(Icons.local_fire_department_rounded),
+            label: '인기',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.map_outlined),
@@ -129,7 +144,7 @@ class _HomePageState extends State<HomePage> {
           icon: const Icon(Icons.edit_rounded),
           label: const Text('글쓰기'),
         ),
-        3 when SessionService.isAdmin => FloatingActionButton.extended(
+        4 when SessionService.isAdmin => FloatingActionButton.extended(
           backgroundColor: AppTheme.crimson,
           foregroundColor: Colors.white,
           onPressed: () => _showScheduleSheet(context),
@@ -245,6 +260,7 @@ class _BoardTab extends StatelessWidget {
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
+
         final docs = snapshot.data!.docs;
         if (docs.isEmpty) {
           return const EmptyState(
@@ -256,52 +272,164 @@ class _BoardTab extends StatelessWidget {
 
         return ListView.separated(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
-          itemCount: docs.length,
+          itemCount: docs.length + 1,
           separatorBuilder: (_, _) => const SizedBox(height: 10),
           itemBuilder: (context, index) {
-            final doc = docs[index];
-            final data = doc.data();
-            final isNotice = data['isNotice'] == true;
-            return Card(
-              color: isNotice ? const Color(0xFFFFF5F5) : Colors.white,
-              child: ListTile(
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                leading: CircleAvatar(
-                  backgroundColor: isNotice
-                      ? AppTheme.crimson
-                      : const Color(0xFFF1F1F1),
-                  foregroundColor: isNotice ? Colors.white : AppTheme.ink,
-                  child: Icon(
-                    isNotice ? Icons.campaign : Icons.chat_bubble_outline,
-                  ),
-                ),
-                title: Text(
-                  (data['title'] ?? '').toString(),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w800),
-                ),
-                subtitle: Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    (data['content'] ?? '').toString(),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => DetailPage(postId: doc.id)),
-                ),
-              ),
-            );
+            if (index == 0) {
+              return const _SectionHeader(
+                icon: Icons.campaign_rounded,
+                title: '공지 우선 게시판',
+                message: '학생회 공지가 항상 일반 게시글보다 먼저 보입니다.',
+                color: AppTheme.crimson,
+              );
+            }
+            final doc = docs[index - 1];
+            return _PostCard(doc: doc);
           },
         );
       },
+    );
+  }
+}
+
+class _PopularTab extends StatelessWidget {
+  const _PopularTab({required this.board});
+
+  final BoardService board;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: board.watchAllPosts(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return EmptyState(
+            icon: Icons.error_outline_rounded,
+            title: '인기게시물을 불러오지 못했습니다',
+            message: snapshot.error.toString(),
+          );
+        }
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final docs = snapshot.data!.docs.where((doc) {
+          final data = doc.data();
+          final likes = (data['likes'] as num?)?.toInt() ?? 0;
+          return data['isNotice'] != true &&
+              likes >= BoardService.popularLikeThreshold;
+        }).toList()..sort(_comparePopularPosts);
+
+        if (docs.isEmpty) {
+          return const EmptyState(
+            icon: Icons.local_fire_department_outlined,
+            title: '인기게시물이 없습니다',
+            message: '좋아요 10개 이상인 일반 게시글이 여기에 표시됩니다.',
+          );
+        }
+
+        return ListView.separated(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
+          itemCount: docs.length + 1,
+          separatorBuilder: (_, _) => const SizedBox(height: 10),
+          itemBuilder: (context, index) {
+            if (index == 0) {
+              return const _SectionHeader(
+                icon: Icons.local_fire_department_rounded,
+                title: '인기게시물',
+                message: '공지와 분리해서 좋아요 10개 이상 게시글만 모았습니다.',
+                color: AppTheme.teal,
+              );
+            }
+            return _PostCard(doc: docs[index - 1], forcePopularBadge: true);
+          },
+        );
+      },
+    );
+  }
+
+  static int _comparePopularPosts(
+    QueryDocumentSnapshot<Map<String, dynamic>> a,
+    QueryDocumentSnapshot<Map<String, dynamic>> b,
+  ) {
+    final aData = a.data();
+    final bData = b.data();
+    final aLikes = (aData['likes'] as num?)?.toInt() ?? 0;
+    final bLikes = (bData['likes'] as num?)?.toInt() ?? 0;
+    final byLikes = bLikes.compareTo(aLikes);
+    if (byLikes != 0) return byLikes;
+
+    final aTime = aData['timestamp'];
+    final bTime = bData['timestamp'];
+    final aMillis = aTime is Timestamp ? aTime.millisecondsSinceEpoch : 0;
+    final bMillis = bTime is Timestamp ? bTime.millisecondsSinceEpoch : 0;
+    return bMillis.compareTo(aMillis);
+  }
+}
+
+class _PostCard extends StatelessWidget {
+  const _PostCard({required this.doc, this.forcePopularBadge = false});
+
+  final QueryDocumentSnapshot<Map<String, dynamic>> doc;
+  final bool forcePopularBadge;
+
+  @override
+  Widget build(BuildContext context) {
+    final data = doc.data();
+    final isNotice = data['isNotice'] == true;
+    final likes = (data['likes'] as num?)?.toInt() ?? 0;
+    final isPopular =
+        forcePopularBadge ||
+        (!isNotice && likes >= BoardService.popularLikeThreshold);
+
+    return Card(
+      color: isNotice ? const Color(0xFFFFF2EC) : AppTheme.panel,
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: CircleAvatar(
+          backgroundColor: isNotice
+              ? AppTheme.crimson
+              : const Color(0xFFFFE8BC),
+          foregroundColor: isNotice ? Colors.white : AppTheme.ink,
+          child: Icon(isNotice ? Icons.campaign : Icons.chat_bubble_outline),
+        ),
+        title: Row(
+          children: [
+            if (isNotice)
+              const _MiniBadge(label: '공지', color: AppTheme.crimson)
+            else if (isPopular)
+              const _MiniBadge(label: '인기', color: AppTheme.teal),
+            if (isNotice || isPopular) const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                (data['title'] ?? '').toString(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w900),
+              ),
+            ),
+          ],
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 5),
+          child: Text(
+            (data['content'] ?? '').toString(),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        trailing: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.favorite_rounded, size: 18, color: Colors.red),
+            Text('$likes', style: const TextStyle(fontWeight: FontWeight.w800)),
+          ],
+        ),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => DetailPage(postId: doc.id)),
+        ),
+      ),
     );
   }
 }
@@ -320,7 +448,7 @@ class _MapTab extends StatelessWidget {
           child: Container(
             margin: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppTheme.panel,
               borderRadius: BorderRadius.circular(18),
               border: Border.all(color: AppTheme.line),
             ),
@@ -336,7 +464,7 @@ class _FestivalMapPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final road = Paint()
-      ..color = const Color(0xFFE7E5E4)
+      ..color = const Color(0xFFE7D2B8)
       ..strokeWidth = 18
       ..strokeCap = StrokeCap.round;
     final path = Path()
@@ -405,42 +533,53 @@ class _ProfileTab extends StatelessWidget {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const CircleAvatar(
-              radius: 48,
-              backgroundColor: Colors.white,
-              child: Icon(
-                Icons.person_rounded,
-                size: 58,
-                color: AppTheme.muted,
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: AppTheme.panel,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppTheme.line),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircleAvatar(
+                radius: 48,
+                backgroundColor: Color(0xFFFFE8BC),
+                child: Icon(
+                  Icons.person_rounded,
+                  size: 58,
+                  color: AppTheme.crimson,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              userId,
-              style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              SessionService.isAdmin ? '관리자 계정' : '학생 계정',
-              style: const TextStyle(color: AppTheme.muted),
-            ),
-            const SizedBox(height: 28),
-            OutlinedButton.icon(
-              onPressed: () async {
-                await SessionService.clear();
-                if (!context.mounted) return;
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (_) => const auth.LoginPage()),
-                  (_) => false,
-                );
-              },
-              icon: const Icon(Icons.logout_rounded),
-              label: const Text('로그아웃'),
-            ),
-          ],
+              const SizedBox(height: 16),
+              Text(
+                userId,
+                style: const TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                SessionService.isAdmin ? '관리자 계정' : '학생 계정',
+                style: const TextStyle(color: AppTheme.muted),
+              ),
+              const SizedBox(height: 28),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  await SessionService.clear();
+                  if (!context.mounted) return;
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => const auth.LoginPage()),
+                    (_) => false,
+                  );
+                },
+                icon: const Icon(Icons.logout_rounded),
+                label: const Text('로그아웃'),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -477,10 +616,18 @@ class _ScheduleTab extends StatelessWidget {
         }
         return ListView.separated(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
-          itemCount: docs.length,
+          itemCount: docs.length + 1,
           separatorBuilder: (_, _) => const SizedBox(height: 10),
           itemBuilder: (context, index) {
-            final doc = docs[index];
+            if (index == 0) {
+              return const _SectionHeader(
+                icon: Icons.calendar_month_rounded,
+                title: '축제 일정',
+                message: '공연, 부스, 이벤트 시간을 한눈에 확인하세요.',
+                color: AppTheme.gold,
+              );
+            }
+            final doc = docs[index - 1];
             final data = doc.data();
             return Card(
               child: ListTile(
@@ -491,7 +638,7 @@ class _ScheduleTab extends StatelessWidget {
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF6E9E8),
+                    color: const Color(0xFFFFE8BC),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
@@ -519,6 +666,88 @@ class _ScheduleTab extends StatelessWidget {
           },
         );
       },
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({
+    required this.icon,
+    required this.title,
+    required this.message,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.24)),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            backgroundColor: color,
+            foregroundColor: Colors.white,
+            child: Icon(icon),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: color == AppTheme.gold ? AppTheme.ink : color,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  message,
+                  style: const TextStyle(color: AppTheme.muted, height: 1.35),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniBadge extends StatelessWidget {
+  const _MiniBadge({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
     );
   }
 }

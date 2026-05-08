@@ -26,13 +26,14 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyDmBYdvBmNCSm53qvi1KxAgbnuJzJ0sOJg',
-    appId: '1:214301372203:web:0ac73d293a9ac5d9411f6e',
-    messagingSenderId: '214301372203',
-    projectId: 'cetral',
-    authDomain: 'cetral.firebaseapp.com',
-    storageBucket: 'cetral.firebasestorage.app',
-    measurementId: 'G-6CVDDPKEJZ',
+    // Web도 Android/Windows와 같은 Firebase 프로젝트를 바라보도록 맞춘다.
+    apiKey: 'AIzaSyCPgtWinuaT__Jf6_gDQVxhioqCAQ_wnc8',
+    appId: '1:456373103467:web:59e706eb07dbfb7afefa2e',
+    messagingSenderId: '456373103467',
+    projectId: 'test1-8b353',
+    authDomain: 'test1-8b353.firebaseapp.com',
+    storageBucket: 'test1-8b353.firebasestorage.app',
+    measurementId: 'G-FW9FE6VTHH',
   );
 
   static const FirebaseOptions android = FirebaseOptions(

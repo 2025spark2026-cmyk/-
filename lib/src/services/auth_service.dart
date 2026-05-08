@@ -32,6 +32,7 @@ class AuthService {
       throw AuthException('아이디 또는 비밀번호를 확인해 주세요.');
     }
 
+    // 예전 평문 비밀번호 계정은 로그인 성공 시 해시 방식으로 자동 전환한다.
     if (passwordHash == null) {
       await _users.doc(id).set({
         'passwordHash': _hash(password),

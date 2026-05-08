@@ -8,6 +8,8 @@ class BoardService {
     : _firestore = firestore ?? FirebaseFirestore.instance,
       _storage = storage ?? FirebaseStorage.instance;
 
+  static const popularLikeThreshold = 10;
+
   final FirebaseFirestore _firestore;
   final FirebaseStorage _storage;
 
@@ -19,6 +21,11 @@ class BoardService {
         .orderBy('isNotice', descending: true)
         .orderBy('timestamp', descending: true)
         .snapshots();
+  }
+
+  // 인기게시물은 공지와 섞지 않기 위해 화면에서 별도 탭으로 분리한다.
+  Stream<QuerySnapshot<Map<String, dynamic>>> watchAllPosts() {
+    return _posts.snapshots();
   }
 
   Stream<DocumentSnapshot<Map<String, dynamic>>> watchPost(String id) {
@@ -41,14 +48,21 @@ class BoardService {
     required bool anonymous,
     required bool notice,
     Uint8List? imageBytes,
+    String? imageExtension,
+    String? imageContentType,
   }) async {
     var imageUrl = '';
     if (imageBytes != null && imageBytes.isNotEmpty) {
-      final path = 'posts/${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final extension = _safeExtension(imageExtension);
+      final path = 'posts/${DateTime.now().millisecondsSinceEpoch}.$extension';
       final ref = _storage.ref(path);
+
+      // 웹과 모바일 모두 readAsBytes 결과를 Storage에 업로드한다.
       await ref.putData(
         imageBytes,
-        SettableMetadata(contentType: 'image/jpeg'),
+        SettableMetadata(
+          contentType: imageContentType ?? _contentTypeFor(extension),
+        ),
       );
       imageUrl = await ref.getDownloadURL();
     }
@@ -83,27 +97,31 @@ class BoardService {
   Future<void> toggleLike({
     required String postId,
     required String userId,
-  }) async {
-    await _firestore.runTransaction((transaction) async {
-      final ref = _posts.doc(postId);
-      final snapshot = await transaction.get(ref);
-      if (!snapshot.exists) return;
-
-      final data = snapshot.data() ?? {};
-      final likedBy = List<String>.from(data['likedBy'] ?? []);
-      final liked = likedBy.contains(userId);
-      final likes = (data['likes'] as num?)?.toInt() ?? likedBy.length;
-
-      if (liked) {
-        likedBy.remove(userId);
-      } else {
-        likedBy.add(userId);
-      }
-
-      transaction.update(ref, {
-        'likedBy': likedBy,
-        'likes': liked ? (likes - 1).clamp(0, 1 << 31) : likes + 1,
-      });
+    required bool currentlyLiked,
+  }) {
+    // 현재 화면 상태를 기준으로 원자적 업데이트를 적용해 숫자가 즉시 바뀌게 한다.
+    return _posts.doc(postId).update({
+      'likedBy': currentlyLiked
+          ? FieldValue.arrayRemove([userId])
+          : FieldValue.arrayUnion([userId]),
+      'likes': FieldValue.increment(currentlyLiked ? -1 : 1),
     });
+  }
+
+  String _safeExtension(String? value) {
+    final extension = (value ?? 'jpg').toLowerCase().replaceAll('.', '');
+    if (extension == 'png' || extension == 'webp' || extension == 'gif') {
+      return extension;
+    }
+    return 'jpg';
+  }
+
+  String _contentTypeFor(String extension) {
+    return switch (extension) {
+      'png' => 'image/png',
+      'webp' => 'image/webp',
+      'gif' => 'image/gif',
+      _ => 'image/jpeg',
+    };
   }
 }
