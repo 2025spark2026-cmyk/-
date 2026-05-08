@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Central Festival App</string>
+	<string>중앙 축제</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>central_festival_app</string>
+	<string>중앙 축제</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -50,9 +50,9 @@
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>사진 첨부를 위해 사진 보관함 접근 권한이 필요합니다.</string>
+	<string>게시글에 사진을 첨부하기 위해 사진 보관함 접근 권한이 필요합니다.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>사진 촬영을 위해 카메라 접근 권한이 필요합니다.</string>
+	<string>게시글에 사진을 첨부하기 위해 카메라 접근 권한이 필요합니다.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

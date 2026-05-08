@@ -1,7 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="central_festival_app"
+        android:label="중앙 축제"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

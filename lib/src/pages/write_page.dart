@@ -104,7 +104,7 @@ class _WritePageState extends State<WritePage> {
             child: const Text(
               '게시',
               style: TextStyle(
-                color: Colors.white,
+                color: AppTheme.primary,
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -147,7 +147,7 @@ class _WritePageState extends State<WritePage> {
             child: Container(
               height: 190,
               decoration: BoxDecoration(
-                color: AppTheme.panel,
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: AppTheme.line),
               ),

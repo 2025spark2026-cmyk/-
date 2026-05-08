@@ -76,104 +76,91 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    final modeColor = _loginMode ? AppTheme.crimson : AppTheme.teal;
-    final modeTitle = _loginMode ? '로그인' : '회원가입';
-    final modeIcon = _loginMode
-        ? Icons.lock_open_rounded
-        : Icons.person_add_alt_1_rounded;
+    final title = _loginMode ? '로그인' : '회원가입';
+    final description = _loginMode
+        ? '축제 공지와 게시글을 확인하려면 로그인해 주세요.'
+        : '아이디와 비밀번호만으로 간단히 시작할 수 있습니다.';
 
     return Scaffold(
-      backgroundColor: AppTheme.crimson,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 430),
+              constraints: const BoxConstraints(maxWidth: 420),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Icon(
-                    Icons.festival_rounded,
-                    size: 64,
-                    color: Colors.white,
-                  ),
-                  const SizedBox(height: 12),
                   const Text(
                     '중앙 축제',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
+                      fontSize: 34,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.ink,
                     ),
                   ),
-                  const SizedBox(height: 26),
+                  const SizedBox(height: 6),
+                  const Text(
+                    '공지, 게시판, 일정까지 한 곳에서',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: AppTheme.muted, fontSize: 15),
+                  ),
+                  const SizedBox(height: 34),
                   Container(
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE9E9EF),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      children: [
+                        _ModeButton(
+                          selected: _loginMode,
+                          label: '로그인',
+                          onTap: _loading
+                              ? null
+                              : () => setState(() => _loginMode = true),
+                        ),
+                        _ModeButton(
+                          selected: !_loginMode,
+                          label: '회원가입',
+                          onTap: _loading
+                              ? null
+                              : () => setState(() {
+                                  _loginMode = false;
+                                  _confirmPasswordController.clear();
+                                }),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Container(
+                    padding: const EdgeInsets.all(22),
                     decoration: BoxDecoration(
                       color: AppTheme.panel,
-                      borderRadius: BorderRadius.circular(18),
+                      borderRadius: BorderRadius.circular(22),
                       border: Border.all(color: AppTheme.line),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        SegmentedButton<bool>(
-                          segments: const [
-                            ButtonSegment(
-                              value: true,
-                              label: Text('로그인'),
-                              icon: Icon(Icons.login_rounded),
-                            ),
-                            ButtonSegment(
-                              value: false,
-                              label: Text('회원가입'),
-                              icon: Icon(Icons.person_add_rounded),
-                            ),
-                          ],
-                          selected: {_loginMode},
-                          onSelectionChanged: _loading
-                              ? null
-                              : (value) => setState(() {
-                                  _loginMode = value.first;
-                                  _confirmPasswordController.clear();
-                                }),
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.ink,
+                          ),
                         ),
-                        const SizedBox(height: 22),
-                        Row(
-                          children: [
-                            CircleAvatar(
-                              backgroundColor: modeColor,
-                              foregroundColor: Colors.white,
-                              child: Icon(modeIcon),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    modeTitle,
-                                    style: TextStyle(
-                                      color: modeColor,
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                  ),
-                                  Text(
-                                    _loginMode
-                                        ? '기존 계정으로 축제 정보를 확인하세요.'
-                                        : '새 계정을 만든 뒤 로그인할 수 있습니다.',
-                                    style: const TextStyle(
-                                      color: AppTheme.muted,
-                                      height: 1.35,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                        const SizedBox(height: 6),
+                        Text(
+                          description,
+                          style: const TextStyle(
+                            color: AppTheme.muted,
+                            height: 1.4,
+                          ),
                         ),
                         const SizedBox(height: 22),
                         TextField(
@@ -207,14 +194,14 @@ class _LoginPageState extends State<LoginPage> {
                             onSubmitted: (_) => _submit(),
                             decoration: const InputDecoration(
                               labelText: '비밀번호 확인',
-                              prefixIcon: Icon(Icons.verified_user_outlined),
+                              prefixIcon: Icon(Icons.check_circle_outline),
                             ),
                           ),
                         ],
                         const SizedBox(height: 22),
-                        ElevatedButton.icon(
+                        ElevatedButton(
                           onPressed: _loading ? null : _submit,
-                          icon: _loading
+                          child: _loading
                               ? const SizedBox(
                                   width: 20,
                                   height: 20,
@@ -223,17 +210,59 @@ class _LoginPageState extends State<LoginPage> {
                                     color: Colors.white,
                                   ),
                                 )
-                              : Icon(modeIcon),
-                          label: Text(modeTitle),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: modeColor,
-                          ),
+                              : Text(title),
                         ),
                       ],
                     ),
                   ),
                 ],
               ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ModeButton extends StatelessWidget {
+  const _ModeButton({
+    required this.selected,
+    required this.label,
+    required this.onTap,
+  });
+
+  final bool selected;
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          height: 42,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(11),
+            boxShadow: selected
+                ? const [
+                    BoxShadow(
+                      color: Color(0x14000000),
+                      blurRadius: 8,
+                      offset: Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: selected ? AppTheme.ink : AppTheme.muted,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ),

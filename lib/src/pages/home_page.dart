@@ -49,13 +49,7 @@ class _HomePageState extends State<HomePage> {
       await showDialog<void>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.campaign_rounded, color: AppTheme.crimson),
-              SizedBox(width: 8),
-              Text('최근 공지'),
-            ],
-          ),
+          title: const Text('최근 공지'),
           content: Text((data['title'] ?? '새 공지가 있습니다.').toString()),
           actions: [
             TextButton(
@@ -82,25 +76,16 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(_titles[_index])),
-      body: DecoratedBox(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFFFFEBD6), AppTheme.surface],
-          ),
-        ),
-        child: PageView(
-          controller: _pageController,
-          onPageChanged: (value) => setState(() => _index = value),
-          children: [
-            _BoardTab(board: _board),
-            _PopularTab(board: _board),
-            const _MapTab(),
-            const _ProfileTab(),
-            _ScheduleTab(schedule: _schedule),
-          ],
-        ),
+      body: PageView(
+        controller: _pageController,
+        onPageChanged: (value) => setState(() => _index = value),
+        children: [
+          _BoardTab(board: _board),
+          _PopularTab(board: _board),
+          const _MapTab(),
+          _ProfileTab(board: _board),
+          _ScheduleTab(schedule: _schedule),
+        ],
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _index,
@@ -112,8 +97,8 @@ class _HomePageState extends State<HomePage> {
             label: '게시판',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.local_fire_department_outlined),
-            activeIcon: Icon(Icons.local_fire_department_rounded),
+            icon: Icon(Icons.trending_up_rounded),
+            activeIcon: Icon(Icons.trending_up_rounded),
             label: '인기',
           ),
           BottomNavigationBarItem(
@@ -135,8 +120,6 @@ class _HomePageState extends State<HomePage> {
       ),
       floatingActionButton: switch (_index) {
         0 => FloatingActionButton.extended(
-          backgroundColor: AppTheme.crimson,
-          foregroundColor: Colors.white,
           onPressed: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const WritePage()),
@@ -145,8 +128,6 @@ class _HomePageState extends State<HomePage> {
           label: const Text('글쓰기'),
         ),
         4 when SessionService.isAdmin => FloatingActionButton.extended(
-          backgroundColor: AppTheme.crimson,
-          foregroundColor: Colors.white,
           onPressed: () => _showScheduleSheet(context),
           icon: const Icon(Icons.add_rounded),
           label: const Text('일정 추가'),
@@ -166,10 +147,11 @@ class _HomePageState extends State<HomePage> {
       await showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
+        showDragHandle: true,
         builder: (context) => Padding(
           padding: EdgeInsets.fromLTRB(
             20,
-            18,
+            8,
             20,
             MediaQuery.of(context).viewInsets.bottom + 20,
           ),
@@ -179,8 +161,8 @@ class _HomePageState extends State<HomePage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const Text(
-                  '일정 추가하기',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+                  '일정 추가',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 16),
                 TextField(
@@ -261,31 +243,20 @@ class _BoardTab extends StatelessWidget {
           return const Center(child: CircularProgressIndicator());
         }
 
-        final docs = snapshot.data!.docs;
+        final docs = snapshot.data!.docs..sort(BoardService.comparePosts);
         if (docs.isEmpty) {
           return const EmptyState(
             icon: Icons.forum_outlined,
             title: '게시글이 없습니다',
-            message: '글쓰기 버튼을 눌러 첫 게시글을 작성해 보세요.',
+            message: '글쓰기 버튼으로 첫 게시글을 작성해 보세요.',
           );
         }
 
         return ListView.separated(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
-          itemCount: docs.length + 1,
+          itemCount: docs.length,
           separatorBuilder: (_, _) => const SizedBox(height: 10),
-          itemBuilder: (context, index) {
-            if (index == 0) {
-              return const _SectionHeader(
-                icon: Icons.campaign_rounded,
-                title: '공지 우선 게시판',
-                message: '학생회 공지가 항상 일반 게시글보다 먼저 보입니다.',
-                color: AppTheme.crimson,
-              );
-            }
-            final doc = docs[index - 1];
-            return _PostCard(doc: doc);
-          },
+          itemBuilder: (context, index) => _PostCard(doc: docs[index]),
         );
       },
     );
@@ -322,26 +293,18 @@ class _PopularTab extends StatelessWidget {
 
         if (docs.isEmpty) {
           return const EmptyState(
-            icon: Icons.local_fire_department_outlined,
+            icon: Icons.trending_up_rounded,
             title: '인기게시물이 없습니다',
-            message: '좋아요 10개 이상인 일반 게시글이 여기에 표시됩니다.',
+            message: '좋아요 10개 이상인 일반 게시글만 표시됩니다.',
           );
         }
 
         return ListView.separated(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
-          itemCount: docs.length + 1,
+          itemCount: docs.length,
           separatorBuilder: (_, _) => const SizedBox(height: 10),
           itemBuilder: (context, index) {
-            if (index == 0) {
-              return const _SectionHeader(
-                icon: Icons.local_fire_department_rounded,
-                title: '인기게시물',
-                message: '공지와 분리해서 좋아요 10개 이상 게시글만 모았습니다.',
-                color: AppTheme.teal,
-              );
-            }
-            return _PostCard(doc: docs[index - 1], forcePopularBadge: true);
+            return _PostCard(doc: docs[index], forcePopularBadge: true);
           },
         );
       },
@@ -358,12 +321,7 @@ class _PopularTab extends StatelessWidget {
     final bLikes = (bData['likes'] as num?)?.toInt() ?? 0;
     final byLikes = bLikes.compareTo(aLikes);
     if (byLikes != 0) return byLikes;
-
-    final aTime = aData['timestamp'];
-    final bTime = bData['timestamp'];
-    final aMillis = aTime is Timestamp ? aTime.millisecondsSinceEpoch : 0;
-    final bMillis = bTime is Timestamp ? bTime.millisecondsSinceEpoch : 0;
-    return bMillis.compareTo(aMillis);
+    return BoardService.compareByTime(aData, bData);
   }
 }
 
@@ -383,51 +341,59 @@ class _PostCard extends StatelessWidget {
         (!isNotice && likes >= BoardService.popularLikeThreshold);
 
     return Card(
-      color: isNotice ? const Color(0xFFFFF2EC) : AppTheme.panel,
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: CircleAvatar(
-          backgroundColor: isNotice
-              ? AppTheme.crimson
-              : const Color(0xFFFFE8BC),
-          foregroundColor: isNotice ? Colors.white : AppTheme.ink,
-          child: Icon(isNotice ? Icons.campaign : Icons.chat_bubble_outline),
-        ),
-        title: Row(
-          children: [
-            if (isNotice)
-              const _MiniBadge(label: '공지', color: AppTheme.crimson)
-            else if (isPopular)
-              const _MiniBadge(label: '인기', color: AppTheme.teal),
-            if (isNotice || isPopular) const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                (data['title'] ?? '').toString(),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w900),
-              ),
-            ),
-          ],
-        ),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 5),
-          child: Text(
-            (data['content'] ?? '').toString(),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-        trailing: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.favorite_rounded, size: 18, color: Colors.red),
-            Text('$likes', style: const TextStyle(fontWeight: FontWeight.w800)),
-          ],
-        ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => DetailPage(postId: doc.id)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  if (isNotice)
+                    const _MiniBadge(label: '공지', color: AppTheme.primary)
+                  else if (isPopular)
+                    const _MiniBadge(label: '인기', color: AppTheme.teal),
+                  if (isNotice || isPopular) const Spacer(),
+                  const Icon(
+                    Icons.favorite_border_rounded,
+                    size: 17,
+                    color: AppTheme.muted,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '$likes',
+                    style: const TextStyle(
+                      color: AppTheme.muted,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                (data['title'] ?? '').toString(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppTheme.ink,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                (data['content'] ?? '').toString(),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: AppTheme.muted, height: 1.35),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -464,7 +430,7 @@ class _FestivalMapPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final road = Paint()
-      ..color = const Color(0xFFE7D2B8)
+      ..color = const Color(0xFFD1D5DB)
       ..strokeWidth = 18
       ..strokeCap = StrokeCap.round;
     final path = Path()
@@ -490,16 +456,16 @@ class _FestivalMapPainter extends CustomPainter {
       (Offset(size.width * .40, size.height * .76), '부스'),
     ];
 
-    final markerPaint = Paint()..color = AppTheme.crimson;
+    final markerPaint = Paint()..color = AppTheme.primary;
     final textPainter = TextPainter(textDirection: TextDirection.ltr);
     for (final spot in spots) {
-      canvas.drawCircle(spot.$1, 15, markerPaint);
+      canvas.drawCircle(spot.$1, 13, markerPaint);
       textPainter.text = TextSpan(
         text: spot.$2,
         style: const TextStyle(
           color: AppTheme.ink,
           fontSize: 15,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w700,
         ),
       );
       textPainter.layout();
@@ -511,8 +477,8 @@ class _FestivalMapPainter extends CustomPainter {
         text: '축제 지도',
         style: TextStyle(
           color: AppTheme.ink,
-          fontSize: 26,
-          fontWeight: FontWeight.w900,
+          fontSize: 25,
+          fontWeight: FontWeight.w800,
         ),
       ),
       textDirection: TextDirection.ltr,
@@ -525,63 +491,149 @@ class _FestivalMapPainter extends CustomPainter {
 }
 
 class _ProfileTab extends StatelessWidget {
-  const _ProfileTab();
+  const _ProfileTab({required this.board});
+
+  final BoardService board;
 
   @override
   Widget build(BuildContext context) {
     final userId = SessionService.currentUserId ?? 'Guest';
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: AppTheme.panel,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: AppTheme.line),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const CircleAvatar(
-                radius: 48,
-                backgroundColor: Color(0xFFFFE8BC),
-                child: Icon(
-                  Icons.person_rounded,
-                  size: 58,
-                  color: AppTheme.crimson,
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: board.watchAllPosts(),
+      builder: (context, snapshot) {
+        final docs = snapshot.data?.docs ?? [];
+        final myPosts =
+            docs.where((doc) => doc.data()['authorId'] == userId).toList()
+              ..sort((a, b) => BoardService.compareByTime(a.data(), b.data()));
+        final likeCount = myPosts.fold<int>(
+          0,
+          (total, doc) => total + ((doc.data()['likes'] as num?)?.toInt() ?? 0),
+        );
+        final commentCount = myPosts.fold<int>(
+          0,
+          (total, doc) =>
+              total + ((doc.data()['comments'] as List?)?.length ?? 0),
+        );
+
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 96),
+          children: [
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 40,
+                          backgroundColor: const Color(0xFFE5E7EB),
+                          child: Text(
+                            userId.isEmpty ? '?' : userId[0].toUpperCase(),
+                            style: const TextStyle(
+                              color: AppTheme.ink,
+                              fontSize: 30,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 18),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                userId,
+                                style: const TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                SessionService.isAdmin ? '관리자 계정' : '학생 계정',
+                                style: const TextStyle(color: AppTheme.muted),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        _ProfileStat(label: '게시글', value: '${myPosts.length}'),
+                        _ProfileStat(label: '좋아요', value: '$likeCount'),
+                        _ProfileStat(label: '댓글', value: '$commentCount'),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 16),
-              Text(
-                userId,
-                style: const TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w900,
-                ),
+            ),
+            const SizedBox(height: 12),
+            Card(
+              child: Column(
+                children: [
+                  _ProfileRow(
+                    icon: Icons.badge_outlined,
+                    label: '아이디',
+                    value: userId,
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _ProfileRow(
+                    icon: Icons.verified_user_outlined,
+                    label: '권한',
+                    value: SessionService.isAdmin ? '관리자' : '학생',
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _ProfileRow(
+                    icon: Icons.notifications_none_rounded,
+                    label: '공지 알림',
+                    value: '앱 실행 시 표시',
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                SessionService.isAdmin ? '관리자 계정' : '학생 계정',
-                style: const TextStyle(color: AppTheme.muted),
-              ),
-              const SizedBox(height: 28),
-              OutlinedButton.icon(
-                onPressed: () async {
-                  await SessionService.clear();
-                  if (!context.mounted) return;
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (_) => const auth.LoginPage()),
-                    (_) => false,
-                  );
-                },
-                icon: const Icon(Icons.logout_rounded),
-                label: const Text('로그아웃'),
-              ),
-            ],
-          ),
-        ),
-      ),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () async {
+                await SessionService.clear();
+                if (!context.mounted) return;
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const auth.LoginPage()),
+                  (_) => false,
+                );
+              },
+              icon: const Icon(Icons.logout_rounded),
+              label: const Text('로그아웃'),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              '내가 쓴 글',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 10),
+            if (!snapshot.hasData)
+              const Center(child: CircularProgressIndicator())
+            else if (myPosts.isEmpty)
+              const EmptyState(
+                icon: Icons.article_outlined,
+                title: '작성한 글이 없습니다',
+                message: '게시판에서 첫 글을 남겨보세요.',
+              )
+            else
+              ...myPosts
+                  .take(5)
+                  .map(
+                    (doc) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _PostCard(doc: doc),
+                    ),
+                  ),
+          ],
+        );
+      },
     );
   }
 }
@@ -616,18 +668,10 @@ class _ScheduleTab extends StatelessWidget {
         }
         return ListView.separated(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
-          itemCount: docs.length + 1,
+          itemCount: docs.length,
           separatorBuilder: (_, _) => const SizedBox(height: 10),
           itemBuilder: (context, index) {
-            if (index == 0) {
-              return const _SectionHeader(
-                icon: Icons.calendar_month_rounded,
-                title: '축제 일정',
-                message: '공연, 부스, 이벤트 시간을 한눈에 확인하세요.',
-                color: AppTheme.gold,
-              );
-            }
-            final doc = docs[index - 1];
+            final doc = docs[index];
             final data = doc.data();
             return Card(
               child: ListTile(
@@ -638,20 +682,20 @@ class _ScheduleTab extends StatelessWidget {
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFFE8BC),
+                    color: const Color(0xFFF3F4F6),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
                     (data['time'] ?? '').toString(),
                     style: const TextStyle(
-                      color: AppTheme.crimson,
-                      fontWeight: FontWeight.w900,
+                      color: AppTheme.ink,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ),
                 title: Text(
                   (data['title'] ?? '').toString(),
-                  style: const TextStyle(fontWeight: FontWeight.w900),
+                  style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
                 subtitle: Text((data['location'] ?? '').toString()),
                 trailing: const Icon(Icons.chevron_right_rounded),
@@ -670,62 +714,6 @@ class _ScheduleTab extends StatelessWidget {
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({
-    required this.icon,
-    required this.title,
-    required this.message,
-    required this.color,
-  });
-
-  final IconData icon;
-  final String title;
-  final String message;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withValues(alpha: 0.24)),
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            backgroundColor: color,
-            foregroundColor: Colors.white,
-            child: Icon(icon),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: color == AppTheme.gold ? AppTheme.ink : color,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  message,
-                  style: const TextStyle(color: AppTheme.muted, height: 1.35),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _MiniBadge extends StatelessWidget {
   const _MiniBadge({required this.label, required this.color});
 
@@ -735,18 +723,73 @@ class _MiniBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(6),
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         label,
         style: TextStyle(
           color: color,
-          fontSize: 11,
-          fontWeight: FontWeight.w900,
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
         ),
+      ),
+    );
+  }
+}
+
+class _ProfileStat extends StatelessWidget {
+  const _ProfileStat({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 4),
+          Text(label, style: const TextStyle(color: AppTheme.muted)),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileRow extends StatelessWidget {
+  const _ProfileRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        children: [
+          Icon(icon, color: AppTheme.muted),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+          Text(value, style: const TextStyle(color: AppTheme.muted)),
+        ],
       ),
     );
   }

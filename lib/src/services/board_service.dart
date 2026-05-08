@@ -17,13 +17,10 @@ class BoardService {
       _firestore.collection('posts');
 
   Stream<QuerySnapshot<Map<String, dynamic>>> watchPosts() {
-    return _posts
-        .orderBy('isNotice', descending: true)
-        .orderBy('timestamp', descending: true)
-        .snapshots();
+    // 복합 인덱스 없이 동작하도록 서버 정렬은 피하고 화면에서 정렬한다.
+    return _posts.snapshots();
   }
 
-  // 인기게시물은 공지와 섞지 않기 위해 화면에서 별도 탭으로 분리한다.
   Stream<QuerySnapshot<Map<String, dynamic>>> watchAllPosts() {
     return _posts.snapshots();
   }
@@ -35,10 +32,10 @@ class BoardService {
   Future<QueryDocumentSnapshot<Map<String, dynamic>>?> latestNotice() async {
     final result = await _posts
         .where('isNotice', isEqualTo: true)
-        .orderBy('timestamp', descending: true)
-        .limit(1)
+        .limit(20)
         .get();
-    return result.docs.isEmpty ? null : result.docs.first;
+    final docs = result.docs..sort(comparePosts);
+    return docs.isEmpty ? null : docs.first;
   }
 
   Future<String> createPost({
@@ -57,7 +54,6 @@ class BoardService {
       final path = 'posts/${DateTime.now().millisecondsSinceEpoch}.$extension';
       final ref = _storage.ref(path);
 
-      // 웹과 모바일 모두 readAsBytes 결과를 Storage에 업로드한다.
       await ref.putData(
         imageBytes,
         SettableMetadata(
@@ -99,13 +95,32 @@ class BoardService {
     required String userId,
     required bool currentlyLiked,
   }) {
-    // 현재 화면 상태를 기준으로 원자적 업데이트를 적용해 숫자가 즉시 바뀌게 한다.
     return _posts.doc(postId).update({
       'likedBy': currentlyLiked
           ? FieldValue.arrayRemove([userId])
           : FieldValue.arrayUnion([userId]),
       'likes': FieldValue.increment(currentlyLiked ? -1 : 1),
     });
+  }
+
+  static int comparePosts(
+    QueryDocumentSnapshot<Map<String, dynamic>> a,
+    QueryDocumentSnapshot<Map<String, dynamic>> b,
+  ) {
+    final aData = a.data();
+    final bData = b.data();
+    final aNotice = aData['isNotice'] == true;
+    final bNotice = bData['isNotice'] == true;
+    if (aNotice != bNotice) return aNotice ? -1 : 1;
+    return compareByTime(aData, bData);
+  }
+
+  static int compareByTime(Map<String, dynamic> a, Map<String, dynamic> b) {
+    final aTime = a['timestamp'];
+    final bTime = b['timestamp'];
+    final aMillis = aTime is Timestamp ? aTime.millisecondsSinceEpoch : 0;
+    final bMillis = bTime is Timestamp ? bTime.millisecondsSinceEpoch : 0;
+    return bMillis.compareTo(aMillis);
   }
 
   String _safeExtension(String? value) {

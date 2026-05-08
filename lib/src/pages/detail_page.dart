@@ -107,7 +107,7 @@ class _DetailPageState extends State<DetailPage> {
                           _Badge(
                             icon: Icons.campaign_rounded,
                             label: '공지',
-                            color: AppTheme.crimson,
+                            color: AppTheme.primary,
                           ),
                         if (isPopular)
                           const _Badge(
@@ -196,7 +196,7 @@ class _DetailPageState extends State<DetailPage> {
                                     (comment['author'] ?? 'Guest').toString(),
                                     style: const TextStyle(
                                       fontWeight: FontWeight.w800,
-                                      color: AppTheme.crimson,
+                                      color: AppTheme.primary,
                                     ),
                                   ),
                                   const SizedBox(height: 2),
@@ -233,7 +233,7 @@ class _DetailPageState extends State<DetailPage> {
                       ),
                       IconButton(
                         onPressed: _commenting ? null : _comment,
-                        color: AppTheme.crimson,
+                        color: AppTheme.primary,
                         icon: const Icon(Icons.send_rounded),
                       ),
                     ],
@@ -298,7 +298,7 @@ class EmptyImageState extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: 180,
-      color: const Color(0xFFF4ECE2),
+      color: const Color(0xFFF3F4F6),
       alignment: Alignment.center,
       child: const Text(
         '이미지를 불러오지 못했습니다.',
