@@ -17,6 +17,7 @@ class DetailPage extends StatefulWidget {
 class _DetailPageState extends State<DetailPage> {
   final _board = BoardService();
   final _commentController = TextEditingController();
+  bool _commenting = false;
 
   @override
   void dispose() {
@@ -26,34 +27,41 @@ class _DetailPageState extends State<DetailPage> {
 
   Future<void> _comment() async {
     final text = _commentController.text.trim();
-    if (text.isEmpty) return;
-    await _board.addComment(
-      postId: widget.postId,
-      author: SessionService.currentUserId ?? 'Guest',
-      text: text,
-    );
-    _commentController.clear();
-    if (mounted) FocusScope.of(context).unfocus();
+    if (text.isEmpty || _commenting) return;
+
+    setState(() => _commenting = true);
+    try {
+      await _board.addComment(
+        postId: widget.postId,
+        author: SessionService.currentUserId ?? 'Guest',
+        text: text,
+      );
+      _commentController.clear();
+      if (mounted) FocusScope.of(context).unfocus();
+    } finally {
+      if (mounted) setState(() => _commenting = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('공지')),
+      appBar: AppBar(title: const Text('게시글')),
       body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
         stream: _board.watchPost(widget.postId),
         builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(child: Text('게시글을 불러오지 못했습니다: ${snapshot.error}'));
+          }
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
           if (!snapshot.data!.exists) {
-            return const Center(child: Text('이 게시물은 더 이상 존재하지 않습니다.'));
+            return const Center(child: Text('게시글이 더 이상 존재하지 않습니다.'));
           }
 
           final data = snapshot.data!.data() ?? {};
-          final comments = List<Map<String, dynamic>>.from(
-            data['comments'] ?? [],
-          );
+          final comments = _readComments(data['comments']);
           final likedBy = List<String>.from(data['likedBy'] ?? []);
           final userId = SessionService.currentUserId;
           final liked = userId != null && likedBy.contains(userId);
@@ -66,7 +74,7 @@ class _DetailPageState extends State<DetailPage> {
                   padding: const EdgeInsets.all(20),
                   children: [
                     if (data['isNotice'] == true)
-                      Text(
+                      const Text(
                         '공지',
                         style: TextStyle(
                           color: AppTheme.crimson,
@@ -75,8 +83,8 @@ class _DetailPageState extends State<DetailPage> {
                       ),
                     const SizedBox(height: 6),
                     Text(
-                      data['title'] ?? '',
-                      style: TextStyle(
+                      (data['title'] ?? '').toString(),
+                      style: const TextStyle(
                         fontSize: 27,
                         fontWeight: FontWeight.w900,
                       ),
@@ -84,22 +92,22 @@ class _DetailPageState extends State<DetailPage> {
                     const SizedBox(height: 10),
                     Text(
                       "${data['authorName'] ?? 'Guest'} · ${_formatTime(timestamp)}",
-                      style: TextStyle(color: AppTheme.muted),
+                      style: const TextStyle(color: AppTheme.muted),
                     ),
                     const SizedBox(height: 22),
                     if ((data['imageUrl'] ?? '').toString().isNotEmpty) ...[
                       ClipRRect(
                         borderRadius: BorderRadius.circular(16),
                         child: Image.network(
-                          data['imageUrl'],
+                          data['imageUrl'].toString(),
                           fit: BoxFit.cover,
                         ),
                       ),
                       const SizedBox(height: 22),
                     ],
                     Text(
-                      data['content'] ?? '',
-                      style: TextStyle(fontSize: 17, height: 1.65),
+                      (data['content'] ?? '').toString(),
+                      style: const TextStyle(fontSize: 17, height: 1.65),
                     ),
                     const SizedBox(height: 22),
                     Row(
@@ -123,7 +131,7 @@ class _DetailPageState extends State<DetailPage> {
                     const Divider(height: 38),
                     Text(
                       '댓글 ${comments.length}',
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontWeight: FontWeight.w900,
                         fontSize: 18,
                       ),
@@ -150,14 +158,14 @@ class _DetailPageState extends State<DetailPage> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    comment['author'] ?? 'Guest',
-                                    style: TextStyle(
+                                    (comment['author'] ?? 'Guest').toString(),
+                                    style: const TextStyle(
                                       fontWeight: FontWeight.w800,
                                       color: AppTheme.crimson,
                                     ),
                                   ),
                                   const SizedBox(height: 2),
-                                  Text(comment['text'] ?? ''),
+                                  Text((comment['text'] ?? '').toString()),
                                 ],
                               ),
                             ),
@@ -183,13 +191,13 @@ class _DetailPageState extends State<DetailPage> {
                           minLines: 1,
                           maxLines: 4,
                           decoration: const InputDecoration(
-                            hintText: '댓글 쓰기',
+                            hintText: '댓글 달기',
                             isDense: true,
                           ),
                         ),
                       ),
                       IconButton(
-                        onPressed: _comment,
+                        onPressed: _commenting ? null : _comment,
                         color: AppTheme.crimson,
                         icon: const Icon(Icons.send_rounded),
                       ),
@@ -202,6 +210,14 @@ class _DetailPageState extends State<DetailPage> {
         },
       ),
     );
+  }
+
+  List<Map<String, dynamic>> _readComments(Object? value) {
+    if (value is! List) return const [];
+    return value
+        .whereType<Map>()
+        .map((comment) => Map<String, dynamic>.from(comment))
+        .toList();
   }
 
   String _formatTime(dynamic value) {

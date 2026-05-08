@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:central_festival_app/src/pages/detail_page.dart';
@@ -7,7 +6,6 @@ import 'package:central_festival_app/src/services/session_service.dart';
 import 'package:central_festival_app/src/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:flutter/foundation.dart';
 
 class WritePage extends StatefulWidget {
   const WritePage({super.key});
@@ -20,8 +18,7 @@ class _WritePageState extends State<WritePage> {
   final _board = BoardService();
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
-  File? _image;
-  Uint8List? _webImage;
+  Uint8List? _imageBytes;
   bool _anonymous = true;
   bool _notice = false;
   bool _submitting = false;
@@ -39,19 +36,11 @@ class _WritePageState extends State<WritePage> {
       imageQuality: 75,
       maxWidth: 1800,
     );
-
     if (picked == null) return;
 
-    if (kIsWeb) {
-      final bytes = await picked.readAsBytes();
-      setState(() {
-        _webImage = bytes;
-      });
-    } else {
-      setState(() {
-        _image = File(picked.path);
-      });
-    }
+    final bytes = await picked.readAsBytes();
+    if (!mounted) return;
+    setState(() => _imageBytes = bytes);
   }
 
   Future<void> _submit() async {
@@ -59,7 +48,7 @@ class _WritePageState extends State<WritePage> {
     final content = _contentController.text.trim();
     final authorId = SessionService.currentUserId;
     if (title.isEmpty || content.isEmpty || authorId == null) {
-      _message('Please enter a title and content.');
+      _message('제목과 내용을 입력해 주세요.');
       return;
     }
 
@@ -71,14 +60,15 @@ class _WritePageState extends State<WritePage> {
         authorId: authorId,
         anonymous: _anonymous,
         notice: _notice,
-        image: _image,
+        imageBytes: _imageBytes,
       );
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => DetailPage(postId: postId)),
       );
     } catch (e) {
-      _message('게시를 실패했습니다.: $e');
+      if (!mounted) return;
+      _message('게시글을 등록하지 못했습니다: $e');
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -94,11 +84,14 @@ class _WritePageState extends State<WritePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('작성하기'),
+        title: const Text('글쓰기'),
         actions: [
           TextButton(
             onPressed: _submitting ? null : _submit,
-            child: Text('게시글', style: TextStyle(fontWeight: FontWeight.w900)),
+            child: const Text(
+              '게시',
+              style: TextStyle(fontWeight: FontWeight.w900),
+            ),
           ),
         ],
       ),
@@ -107,7 +100,7 @@ class _WritePageState extends State<WritePage> {
         children: [
           TextField(
             controller: _titleController,
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
             decoration: const InputDecoration(
               hintText: '제목',
               border: InputBorder.none,
@@ -123,7 +116,7 @@ class _WritePageState extends State<WritePage> {
             minLines: 8,
             maxLines: 18,
             decoration: const InputDecoration(
-              hintText: '글을 입력하세요.',
+              hintText: '글을 입력해 주세요.',
               border: InputBorder.none,
               enabledBorder: InputBorder.none,
               focusedBorder: InputBorder.none,
@@ -142,7 +135,7 @@ class _WritePageState extends State<WritePage> {
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: AppTheme.line),
               ),
-              child: (_image == null && _webImage == null)
+              child: _imageBytes == null
                   ? const Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -157,9 +150,7 @@ class _WritePageState extends State<WritePage> {
                     )
                   : ClipRRect(
                       borderRadius: BorderRadius.circular(14),
-                      child: kIsWeb
-                          ? Image.memory(_webImage!, fit: BoxFit.cover)
-                          : Image.file(_image!, fit: BoxFit.cover),
+                      child: Image.memory(_imageBytes!, fit: BoxFit.cover),
                     ),
             ),
           ),

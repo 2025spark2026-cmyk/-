@@ -10,9 +10,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:central_festival_app/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
+  testWidgets('shows splash title', (WidgetTester tester) async {
     await tester.pumpWidget(const MyApp());
-    expect(find.text('Central Festival'), findsOneWidget);
+
+    expect(find.text('중앙 축제'), findsOneWidget);
   });
 }

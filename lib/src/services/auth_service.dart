@@ -12,17 +12,25 @@ class AuthService {
   CollectionReference<Map<String, dynamic>> get _users =>
       _firestore.collection('users');
 
-  String _hash(String password) => sha256.convert(utf8.encode(password)).toString();
+  String _hash(String password) {
+    return sha256.convert(utf8.encode(password)).toString();
+  }
 
   Future<void> signIn({required String id, required String password}) async {
     final doc = await _users.doc(id).get();
-    if (!doc.exists) throw '가입되지 않은 아이디입니다.';
+    if (!doc.exists) {
+      throw AuthException('가입되지 않은 아이디입니다.');
+    }
 
     final data = doc.data() ?? {};
     final passwordHash = data['passwordHash'] as String?;
     final legacyPassword = data['pw'] as String?;
-    final ok = passwordHash == _hash(password) || legacyPassword == password;
-    if (!ok) throw '아이디 또는 비밀번호를 확인해주세요.';
+    final isValidPassword =
+        passwordHash == _hash(password) || legacyPassword == password;
+
+    if (!isValidPassword) {
+      throw AuthException('아이디 또는 비밀번호를 확인해 주세요.');
+    }
 
     if (passwordHash == null) {
       await _users.doc(id).set({
@@ -34,7 +42,9 @@ class AuthService {
 
   Future<void> signUp({required String id, required String password}) async {
     final doc = await _users.doc(id).get();
-    if (doc.exists) throw '이미 사용 중인 아이디입니다.';
+    if (doc.exists) {
+      throw AuthException('이미 사용 중인 아이디입니다.');
+    }
 
     await _users.doc(id).set({
       'passwordHash': _hash(password),
@@ -42,4 +52,13 @@ class AuthService {
       'createdAt': FieldValue.serverTimestamp(),
     });
   }
+}
+
+class AuthException implements Exception {
+  const AuthException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
 }

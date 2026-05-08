@@ -13,31 +13,39 @@ class ScheduleDetailPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('일정 상세보기')),
+      appBar: AppBar(title: const Text('일정 상세')),
       body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
         stream: _schedule.watchSchedule(scheduleId),
         builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(child: Text('일정을 불러오지 못했습니다: ${snapshot.error}'));
+          }
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
           if (!snapshot.data!.exists) {
-            return const Center(child: Text('이 일정은 더 이상 존재하지 않습니다.'));
+            return const Center(child: Text('일정이 더 이상 존재하지 않습니다.'));
           }
           final data = snapshot.data!.data() ?? {};
+          final description = (data['description'] ?? '').toString();
+
           return ListView(
             padding: const EdgeInsets.all(22),
             children: [
               Align(
                 alignment: Alignment.centerLeft,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 7,
+                  ),
                   decoration: BoxDecoration(
                     color: AppTheme.crimson,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
-                    data['time'] ?? '',
-                    style: TextStyle(
+                    (data['time'] ?? '').toString(),
+                    style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w900,
                     ),
@@ -46,8 +54,11 @@ class ScheduleDetailPage extends StatelessWidget {
               ),
               const SizedBox(height: 18),
               Text(
-                data['title'] ?? '',
-                style: TextStyle(fontSize: 29, fontWeight: FontWeight.w900),
+                (data['title'] ?? '').toString(),
+                style: const TextStyle(
+                  fontSize: 29,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
               const SizedBox(height: 14),
               Row(
@@ -56,23 +67,24 @@ class ScheduleDetailPage extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      data['location'] ?? '',
-                      style: TextStyle(fontSize: 16, color: AppTheme.muted),
+                      (data['location'] ?? '').toString(),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: AppTheme.muted,
+                      ),
                     ),
                   ),
                 ],
               ),
               const Divider(height: 46),
-              Text(
+              const Text(
                 '설명',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
               ),
               const SizedBox(height: 12),
               Text(
-                (data['description'] ?? '').toString().isEmpty
-                    ? 'No description available.'
-                    : data['description'],
-                style: TextStyle(fontSize: 16, height: 1.65),
+                description.isEmpty ? '등록된 설명이 없습니다.' : description,
+                style: const TextStyle(fontSize: 16, height: 1.65),
               ),
               if (SessionService.isAdmin) ...[
                 const SizedBox(height: 38),
@@ -87,7 +99,7 @@ class ScheduleDetailPage extends StatelessWidget {
                     if (context.mounted) Navigator.pop(context);
                   },
                   icon: const Icon(Icons.delete_forever_rounded),
-                  label: const Text('이 일정 삭제하기'),
+                  label: const Text('일정 삭제하기'),
                 ),
               ],
             ],

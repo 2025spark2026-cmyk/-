@@ -1,9 +1,7 @@
-import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'dart:typed_data';
-import 'package:flutter/foundation.dart';
 
 class BoardService {
   BoardService({FirebaseFirestore? firestore, FirebaseStorage? storage})
@@ -42,21 +40,16 @@ class BoardService {
     required String authorId,
     required bool anonymous,
     required bool notice,
-    File? image,
-    Uint8List? webImage,
+    Uint8List? imageBytes,
   }) async {
     var imageUrl = '';
-    if (image != null || webImage != null) {
+    if (imageBytes != null && imageBytes.isNotEmpty) {
       final path = 'posts/${DateTime.now().millisecondsSinceEpoch}.jpg';
       final ref = _storage.ref(path);
-      if (kIsWeb && webImage != null) {
-        await ref.putData(
-          webImage,
-          SettableMetadata(contentType: 'image/jpeg'),
-        );
-      } else if (image != null) {
-        await ref.putFile(image, SettableMetadata(contentType: 'image/jpeg'));
-      }
+      await ref.putData(
+        imageBytes,
+        SettableMetadata(contentType: 'image/jpeg'),
+      );
       imageUrl = await ref.getDownloadURL();
     }
 
@@ -91,16 +84,26 @@ class BoardService {
     required String postId,
     required String userId,
   }) async {
-    final doc = await _posts.doc(postId).get();
-    final data = doc.data() ?? {};
-    final likedBy = List<String>.from(data['likedBy'] ?? []);
-    final liked = likedBy.contains(userId);
+    await _firestore.runTransaction((transaction) async {
+      final ref = _posts.doc(postId);
+      final snapshot = await transaction.get(ref);
+      if (!snapshot.exists) return;
 
-    await _posts.doc(postId).update({
-      'likedBy': liked
-          ? FieldValue.arrayRemove([userId])
-          : FieldValue.arrayUnion([userId]),
-      'likes': FieldValue.increment(liked ? -1 : 1),
+      final data = snapshot.data() ?? {};
+      final likedBy = List<String>.from(data['likedBy'] ?? []);
+      final liked = likedBy.contains(userId);
+      final likes = (data['likes'] as num?)?.toInt() ?? likedBy.length;
+
+      if (liked) {
+        likedBy.remove(userId);
+      } else {
+        likedBy.add(userId);
+      }
+
+      transaction.update(ref, {
+        'likedBy': likedBy,
+        'likes': liked ? (likes - 1).clamp(0, 1 << 31) : likes + 1,
+      });
     });
   }
 }

@@ -1,11 +1,11 @@
 {
-    "name": "central_festival_app",
-    "short_name": "central_festival_app",
+    "name": "중앙 축제",
+    "short_name": "중앙 축제",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#891B14",
+    "theme_color": "#891B14",
+    "description": "중앙 축제 공지, 게시판, 지도, 일정을 확인하는 앱입니다.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

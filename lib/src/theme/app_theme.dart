@@ -45,7 +45,10 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 15,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: line),
@@ -65,7 +68,9 @@ class AppTheme {
           elevation: 0,
           backgroundColor: crimson,
           foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
           textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
         ),
       ),
@@ -74,7 +79,10 @@ class AppTheme {
         backgroundColor: Colors.white,
         selectedItemColor: crimson,
         unselectedItemColor: muted,
-        selectedLabelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+        selectedLabelStyle: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+        ),
         unselectedLabelStyle: TextStyle(fontSize: 12),
       ),
       cupertinoOverrideTheme: const CupertinoThemeData(primaryColor: crimson),

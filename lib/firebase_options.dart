@@ -17,7 +17,9 @@ class DefaultFirebaseOptions {
       case TargetPlatform.windows:
         return windows;
       case TargetPlatform.linux:
-        throw UnsupportedError('Firebase options are not configured for Linux.');
+        throw UnsupportedError(
+          'Firebase options are not configured for Linux.',
+        );
       default:
         throw UnsupportedError('Firebase options are not supported here.');
     }
@@ -68,5 +70,4 @@ class DefaultFirebaseOptions {
     storageBucket: 'test1-8b353.firebasestorage.app',
     measurementId: 'G-FW9FE6VTHH',
   );
-
 }

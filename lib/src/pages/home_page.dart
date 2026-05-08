@@ -39,30 +39,35 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _showNotice() async {
     if (SessionService.noticePopupShown) return;
-    final notice = await _board.latestNotice();
-    if (!mounted || notice == null) return;
 
-    SessionService.noticePopupShown = true;
-    final data = notice.data();
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.campaign_rounded, color: AppTheme.crimson),
-            SizedBox(width: 8),
-            Text('Latest Notice'),
+    try {
+      final notice = await _board.latestNotice();
+      if (!mounted || notice == null) return;
+
+      SessionService.noticePopupShown = true;
+      final data = notice.data();
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.campaign_rounded, color: AppTheme.crimson),
+              SizedBox(width: 8),
+              Text('최근 공지'),
+            ],
+          ),
+          content: Text((data['title'] ?? '새 공지가 있습니다.').toString()),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('확인'),
+            ),
           ],
         ),
-        content: Text(data['title'] ?? 'A notice is available.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
+      );
+    } catch (_) {
+      // 공지 팝업 실패가 홈 화면 진입을 막지 않도록 둔다.
+    }
   }
 
   void _go(int index) {
@@ -113,26 +118,26 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
-      floatingActionButton: _index == 0
-          ? FloatingActionButton.extended(
-              backgroundColor: AppTheme.crimson,
-              foregroundColor: Colors.white,
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const WritePage()),
-              ),
-              icon: const Icon(Icons.edit_rounded),
-              label: const Text('글쓰기'),
-            )
-          : _index == 3 && SessionService.isAdmin
-          ? FloatingActionButton.extended(
-              backgroundColor: AppTheme.crimson,
-              foregroundColor: Colors.white,
-              onPressed: () => _showScheduleSheet(context),
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('일정'),
-            )
-          : null,
+      floatingActionButton: switch (_index) {
+        0 => FloatingActionButton.extended(
+          backgroundColor: AppTheme.crimson,
+          foregroundColor: Colors.white,
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const WritePage()),
+          ),
+          icon: const Icon(Icons.edit_rounded),
+          label: const Text('글쓰기'),
+        ),
+        3 when SessionService.isAdmin => FloatingActionButton.extended(
+          backgroundColor: AppTheme.crimson,
+          foregroundColor: Colors.white,
+          onPressed: () => _showScheduleSheet(context),
+          icon: const Icon(Icons.add_rounded),
+          label: const Text('일정 추가'),
+        ),
+        _ => null,
+      },
     );
   }
 
@@ -142,56 +147,81 @@ class _HomePageState extends State<HomePage> {
     final location = TextEditingController();
     final description = TextEditingController();
 
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => Padding(
-        padding: EdgeInsets.fromLTRB(
-          20,
-          18,
-          20,
-          MediaQuery.of(context).viewInsets.bottom + 20,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                '일정 추가하기',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
-              ),
-              const SizedBox(height: 16),
-              TextField(controller: time, decoration: const InputDecoration(labelText: '시간')),
-              const SizedBox(height: 10),
-              TextField(controller: title, decoration: const InputDecoration(labelText: '제목')),
-              const SizedBox(height: 10),
-              TextField(controller: location, decoration: const InputDecoration(labelText: '위치')),
-              const SizedBox(height: 10),
-              TextField(
-                controller: description,
-                minLines: 3,
-                maxLines: 6,
-                decoration: const InputDecoration(labelText: '설명'),
-              ),
-              const SizedBox(height: 18),
-              ElevatedButton(
-                onPressed: () async {
-                  await _schedule.add(
-                    time: time.text.trim(),
-                    title: title.text.trim(),
-                    location: location.text.trim(),
-                    description: description.text.trim(),
-                  );
-                  if (context.mounted) Navigator.pop(context);
-                },
-                child: const Text('저장하기'),
-              ),
-            ],
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        builder: (context) => Padding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            18,
+            20,
+            MediaQuery.of(context).viewInsets.bottom + 20,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  '일정 추가하기',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: time,
+                  decoration: const InputDecoration(labelText: '시간'),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: title,
+                  decoration: const InputDecoration(labelText: '제목'),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: location,
+                  decoration: const InputDecoration(labelText: '위치'),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: description,
+                  minLines: 3,
+                  maxLines: 6,
+                  decoration: const InputDecoration(labelText: '설명'),
+                ),
+                const SizedBox(height: 18),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (title.text.trim().isEmpty || time.text.trim().isEmpty) {
+                      ScaffoldMessenger.of(context)
+                        ..hideCurrentSnackBar()
+                        ..showSnackBar(
+                          const SnackBar(content: Text('시간과 제목을 입력해 주세요.')),
+                        );
+                      return;
+                    }
+
+                    await _schedule.add(
+                      time: time.text.trim(),
+                      title: title.text.trim(),
+                      location: location.text.trim(),
+                      description: description.text.trim(),
+                    );
+                    if (context.mounted) Navigator.pop(context);
+                  },
+                  child: const Text('저장하기'),
+                ),
+              ],
+            ),
           ),
         ),
-      ),
-    );
+      );
+    } finally {
+      time.dispose();
+      title.dispose();
+      location.dispose();
+      description.dispose();
+    }
   }
 }
 
@@ -208,7 +238,7 @@ class _BoardTab extends StatelessWidget {
         if (snapshot.hasError) {
           return EmptyState(
             icon: Icons.error_outline_rounded,
-            title: 'Failed to load posts',
+            title: '게시글을 불러오지 못했습니다',
             message: snapshot.error.toString(),
           );
         }
@@ -219,8 +249,8 @@ class _BoardTab extends StatelessWidget {
         if (docs.isEmpty) {
           return const EmptyState(
             icon: Icons.forum_outlined,
-            title: '게시글 없음',
-            message: '글쓰기 버튼을 눌러 첫 게시글을 작성해보세요!',
+            title: '게시글이 없습니다',
+            message: '글쓰기 버튼을 눌러 첫 게시글을 작성해 보세요.',
           );
         }
 
@@ -235,22 +265,29 @@ class _BoardTab extends StatelessWidget {
             return Card(
               color: isNotice ? const Color(0xFFFFF5F5) : Colors.white,
               child: ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 leading: CircleAvatar(
-                  backgroundColor: isNotice ? AppTheme.crimson : const Color(0xFFF1F1F1),
+                  backgroundColor: isNotice
+                      ? AppTheme.crimson
+                      : const Color(0xFFF1F1F1),
                   foregroundColor: isNotice ? Colors.white : AppTheme.ink,
-                  child: Icon(isNotice ? Icons.campaign : Icons.chat_bubble_outline),
+                  child: Icon(
+                    isNotice ? Icons.campaign : Icons.chat_bubble_outline,
+                  ),
                 ),
                 title: Text(
-                  data['title'] ?? '',
+                  (data['title'] ?? '').toString(),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontWeight: FontWeight.w800),
+                  style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
                 subtitle: Padding(
                   padding: const EdgeInsets.only(top: 4),
                   child: Text(
-                    data['content'] ?? '',
+                    (data['content'] ?? '').toString(),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -304,15 +341,25 @@ class _FestivalMapPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
     final path = Path()
       ..moveTo(size.width * .18, size.height * .16)
-      ..quadraticBezierTo(size.width * .68, size.height * .24, size.width * .76, size.height * .48)
-      ..quadraticBezierTo(size.width * .62, size.height * .72, size.width * .22, size.height * .82);
+      ..quadraticBezierTo(
+        size.width * .68,
+        size.height * .24,
+        size.width * .76,
+        size.height * .48,
+      )
+      ..quadraticBezierTo(
+        size.width * .62,
+        size.height * .72,
+        size.width * .22,
+        size.height * .82,
+      );
     canvas.drawPath(path, road);
 
     final spots = [
-      (Offset(size.width * .26, size.height * .22), 'Gate'),
-      (Offset(size.width * .68, size.height * .34), 'Stage'),
-      (Offset(size.width * .72, size.height * .56), 'Food'),
-      (Offset(size.width * .40, size.height * .76), 'Booths'),
+      (Offset(size.width * .26, size.height * .22), '입구'),
+      (Offset(size.width * .68, size.height * .34), '무대'),
+      (Offset(size.width * .72, size.height * .56), '푸드존'),
+      (Offset(size.width * .40, size.height * .76), '부스'),
     ];
 
     final markerPaint = Paint()..color = AppTheme.crimson;
@@ -321,7 +368,7 @@ class _FestivalMapPainter extends CustomPainter {
       canvas.drawCircle(spot.$1, 15, markerPaint);
       textPainter.text = TextSpan(
         text: spot.$2,
-        style: TextStyle(
+        style: const TextStyle(
           color: AppTheme.ink,
           fontSize: 15,
           fontWeight: FontWeight.w800,
@@ -332,8 +379,8 @@ class _FestivalMapPainter extends CustomPainter {
     }
 
     final title = TextPainter(
-      text: TextSpan(
-        text: 'Festival Map',
+      text: const TextSpan(
+        text: '축제 지도',
         style: TextStyle(
           color: AppTheme.ink,
           fontSize: 26,
@@ -364,17 +411,21 @@ class _ProfileTab extends StatelessWidget {
             const CircleAvatar(
               radius: 48,
               backgroundColor: Colors.white,
-              child: Icon(Icons.person_rounded, size: 58, color: AppTheme.muted),
+              child: Icon(
+                Icons.person_rounded,
+                size: 58,
+                color: AppTheme.muted,
+              ),
             ),
             const SizedBox(height: 16),
             Text(
               userId,
-              style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900),
+              style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 8),
             Text(
-              SessionService.isAdmin ? 'Admin account' : 'Student account',
-              style: TextStyle(color: AppTheme.muted),
+              SessionService.isAdmin ? '관리자 계정' : '학생 계정',
+              style: const TextStyle(color: AppTheme.muted),
             ),
             const SizedBox(height: 28),
             OutlinedButton.icon(
@@ -387,7 +438,7 @@ class _ProfileTab extends StatelessWidget {
                 );
               },
               icon: const Icon(Icons.logout_rounded),
-              label: const Text('Logout'),
+              label: const Text('로그아웃'),
             ),
           ],
         ),
@@ -409,7 +460,7 @@ class _ScheduleTab extends StatelessWidget {
         if (snapshot.hasError) {
           return EmptyState(
             icon: Icons.error_outline_rounded,
-            title: 'Failed to load schedules',
+            title: '일정을 불러오지 못했습니다',
             message: snapshot.error.toString(),
           );
         }
@@ -420,8 +471,8 @@ class _ScheduleTab extends StatelessWidget {
         if (docs.isEmpty) {
           return const EmptyState(
             icon: Icons.calendar_today_outlined,
-            title: '아직 추가된 일정이 없습니다.',
-            message: '관리자는 이 탭에서 일정을 추가할 수 있습니다.',
+            title: '아직 추가된 일정이 없습니다',
+            message: '관리자 계정에서 일정을 추가할 수 있습니다.',
           );
         }
         return ListView.separated(
@@ -435,24 +486,27 @@ class _ScheduleTab extends StatelessWidget {
               child: ListTile(
                 contentPadding: const EdgeInsets.all(16),
                 leading: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFF6E9E8),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
-                    data['time'] ?? '',
-                    style: TextStyle(
+                    (data['time'] ?? '').toString(),
+                    style: const TextStyle(
                       color: AppTheme.crimson,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
                 ),
                 title: Text(
-                  data['title'] ?? '',
-                  style: TextStyle(fontWeight: FontWeight.w900),
+                  (data['title'] ?? '').toString(),
+                  style: const TextStyle(fontWeight: FontWeight.w900),
                 ),
-                subtitle: Text(data['location'] ?? ''),
+                subtitle: Text((data['location'] ?? '').toString()),
                 trailing: const Icon(Icons.chevron_right_rounded),
                 onTap: () => Navigator.push(
                   context,

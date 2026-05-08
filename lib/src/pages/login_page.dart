@@ -29,7 +29,7 @@ class _LoginPageState extends State<LoginPage> {
     final id = _idController.text.trim();
     final password = _passwordController.text.trim();
     if (id.isEmpty || password.isEmpty) {
-      _showMessage('아이디와 비밀번호를 모두 입력해 주세요');
+      _showMessage('아이디와 비밀번호를 모두 입력해 주세요.');
       return;
     }
 
@@ -44,10 +44,12 @@ class _LoginPageState extends State<LoginPage> {
         ).pushReplacement(MaterialPageRoute(builder: (_) => const HomePage()));
       } else {
         await _auth.signUp(id: id, password: password);
-        _showMessage('계정이 생성되었습니다. 로그인 해주세요.');
+        if (!mounted) return;
+        _showMessage('계정이 생성되었습니다. 로그인해 주세요.');
         setState(() => _loginMode = true);
       }
     } catch (e) {
+      if (!mounted) return;
       _showMessage(e.toString());
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -74,7 +76,7 @@ class _LoginPageState extends State<LoginPage> {
                 children: [
                   const SizedBox(height: 18),
                   const Text(
-                    '중앙고',
+                    '중앙 축제',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 32,
@@ -85,11 +87,14 @@ class _LoginPageState extends State<LoginPage> {
                   const SizedBox(height: 44),
                   Text(
                     _loginMode ? '로그인' : '회원가입',
-                    style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900),
+                    style: const TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Test.',
+                    '축제 공지, 게시판, 일정 정보를 확인하세요.',
                     style: TextStyle(color: AppTheme.muted, height: 1.4),
                   ),
                   const SizedBox(height: 24),
@@ -97,8 +102,7 @@ class _LoginPageState extends State<LoginPage> {
                     controller: _idController,
                     textInputAction: TextInputAction.next,
                     decoration: const InputDecoration(
-                      labelText: 'User ID',
-
+                      labelText: '아이디',
                       prefixIcon: Icon(Icons.person_outline_rounded),
                     ),
                   ),
@@ -108,7 +112,7 @@ class _LoginPageState extends State<LoginPage> {
                     obscureText: true,
                     onSubmitted: (_) => _submit(),
                     decoration: const InputDecoration(
-                      labelText: 'Password',
+                      labelText: '비밀번호',
                       prefixIcon: Icon(Icons.lock_outline_rounded),
                     ),
                   ),
@@ -132,7 +136,7 @@ class _LoginPageState extends State<LoginPage> {
                         ? null
                         : () => setState(() => _loginMode = !_loginMode),
                     child: Text(
-                      _loginMode ? '계정이 없나요? 회원가입하기' : '계정이 이미 있나요? 로그인하기',
+                      _loginMode ? '계정이 없나요? 회원가입하기' : '이미 계정이 있나요? 로그인하기',
                     ),
                   ),
                 ],
