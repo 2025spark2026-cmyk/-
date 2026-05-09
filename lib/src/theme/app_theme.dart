@@ -6,7 +6,7 @@ class AppTheme {
   static const danger = Color(0xFFFF3B30);
   static const ink = Color(0xFF111827);
   static const muted = Color(0xFF6B7280);
-  static const surface = Color(0xFFF2F2F7);
+  static const surface = Color(0xFFFAFAFB);
   static const panel = Color(0xFFFFFFFF);
   static const line = Color(0xFFE5E7EB);
 
@@ -47,7 +47,7 @@ class AppTheme {
         elevation: 0,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(22),
           side: const BorderSide(color: line),
         ),
       ),
@@ -59,15 +59,15 @@ class AppTheme {
           vertical: 15,
         ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(18),
           borderSide: const BorderSide(color: line),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(18),
           borderSide: const BorderSide(color: line),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(18),
           borderSide: const BorderSide(color: primary, width: 1.3),
         ),
       ),
@@ -78,7 +78,7 @@ class AppTheme {
           backgroundColor: primary,
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(18),
           ),
           textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
         ),

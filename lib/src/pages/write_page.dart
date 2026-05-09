@@ -15,6 +15,8 @@ class WritePage extends StatefulWidget {
 }
 
 class _WritePageState extends State<WritePage> {
+  static const _maxImageBytes = BoardService.maxInlineImageBytes;
+
   final _board = BoardService();
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
@@ -35,13 +37,19 @@ class _WritePageState extends State<WritePage> {
   Future<void> _pickImage() async {
     final picked = await ImagePicker().pickImage(
       source: ImageSource.gallery,
-      imageQuality: 78,
-      maxWidth: 1800,
+      imageQuality: 35,
+      maxWidth: 720,
+      maxHeight: 720,
     );
     if (picked == null) return;
 
     final bytes = await picked.readAsBytes();
     if (!mounted) return;
+    if (bytes.length > _maxImageBytes) {
+      _message('사진 용량이 너무 큽니다. 더 작은 사진을 선택해 주세요.');
+      return;
+    }
+
     setState(() {
       _imageBytes = bytes;
       _imageExtension = _extensionFromName(picked.name);
@@ -76,7 +84,7 @@ class _WritePageState extends State<WritePage> {
       );
     } catch (e) {
       if (!mounted) return;
-      _message('게시글을 등록하지 못했습니다: $e');
+      _message(_submitErrorMessage(e));
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -91,6 +99,13 @@ class _WritePageState extends State<WritePage> {
   String _extensionFromName(String name) {
     final parts = name.split('.');
     return parts.length > 1 ? parts.last : 'jpg';
+  }
+
+  String _submitErrorMessage(Object error) {
+    if (error is ImageTooLargeException) {
+      return error.toString();
+    }
+    return '게시글을 등록하지 못했습니다: $error';
   }
 
   @override

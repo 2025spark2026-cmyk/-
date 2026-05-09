@@ -222,15 +222,29 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-class _BoardTab extends StatelessWidget {
+class _BoardTab extends StatefulWidget {
   const _BoardTab({required this.board});
 
   final BoardService board;
 
   @override
+  State<_BoardTab> createState() => _BoardTabState();
+}
+
+class _BoardTabState extends State<_BoardTab> {
+  final _searchController = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: board.watchPosts(),
+      stream: widget.board.watchPosts(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return EmptyState(
@@ -247,8 +261,8 @@ class _BoardTab extends StatelessWidget {
             snapshot.data!.docs
                 .where(
                   (doc) => !SessionService.isBlocked(
-                    (doc.data()['authorId'] ?? '').toString(),
-                  ),
+                      (doc.data()['authorId'] ?? '').toString(),
+                    ) && !BoardService.isDeleted(doc.data()),
                 )
                 .toList()
               ..sort(BoardService.comparePosts);
@@ -260,14 +274,60 @@ class _BoardTab extends StatelessWidget {
           );
         }
 
+        final filteredDocs = docs
+            .where((doc) => _matchesSearch(doc.data(), _query))
+            .toList();
+
         return ListView.separated(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
-          itemCount: docs.length,
+          itemCount: filteredDocs.isEmpty ? 2 : filteredDocs.length + 1,
           separatorBuilder: (_, _) => const SizedBox(height: 10),
-          itemBuilder: (context, index) => _PostCard(doc: docs[index]),
+          itemBuilder: (context, index) {
+            if (index == 0) {
+              return TextField(
+                controller: _searchController,
+                onChanged: (value) => setState(() => _query = value.trim()),
+                decoration: InputDecoration(
+                  hintText: '게시글 검색',
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  suffixIcon: _query.isEmpty
+                      ? null
+                      : IconButton(
+                          tooltip: '검색어 지우기',
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _query = '');
+                          },
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                ),
+              );
+            }
+
+            if (filteredDocs.isEmpty) {
+              return const EmptyState(
+                icon: Icons.search_off_rounded,
+                title: '검색 결과가 없습니다',
+                message: '다른 검색어로 다시 찾아보세요.',
+              );
+            }
+
+            return _PostCard(doc: filteredDocs[index - 1]);
+          },
         );
       },
     );
+  }
+
+  bool _matchesSearch(Map<String, dynamic> data, String query) {
+    if (query.isEmpty) return true;
+    final target = [
+      data['title'],
+      data['content'],
+      data['authorName'],
+      data['authorId'],
+    ].join(' ').toLowerCase();
+    return target.contains(query.toLowerCase());
   }
 }
 
@@ -279,7 +339,7 @@ class _PopularTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: board.watchAllPosts(),
+      stream: board.watchPopularPosts(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return EmptyState(
@@ -295,6 +355,9 @@ class _PopularTab extends StatelessWidget {
         final docs = snapshot.data!.docs.where((doc) {
           final data = doc.data();
           if (SessionService.isBlocked((data['authorId'] ?? '').toString())) {
+            return false;
+          }
+          if (BoardService.isDeleted(data)) {
             return false;
           }
           final likes = (data['likes'] as num?)?.toInt() ?? 0;
@@ -339,6 +402,11 @@ class _PopularTab extends StatelessWidget {
 class _PostCard extends StatelessWidget {
   const _PostCard({required this.doc, this.forcePopularBadge = false});
 
+  static const _noticeBackground = Color(0xFFFFF1F3);
+  static const _noticeBorder = Color(0xFFE04663);
+  static const _popularBackground = Color(0xFFEFFFF8);
+  static const _popularBorder = Color(0xFF1FAE74);
+
   final QueryDocumentSnapshot<Map<String, dynamic>> doc;
   final bool forcePopularBadge;
 
@@ -351,57 +419,109 @@ class _PostCard extends StatelessWidget {
         forcePopularBadge ||
         (!isNotice && likes >= BoardService.popularLikeThreshold);
 
+    final highlightColor = isNotice
+        ? AppTheme.primary
+        : (isPopular ? AppTheme.teal : AppTheme.line);
+
     return Card(
+      color: isNotice
+          ? _noticeBackground
+          : (isPopular ? _popularBackground : AppTheme.panel),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: isNotice
+              ? _noticeBorder
+              : (isPopular ? _popularBorder : AppTheme.line),
+          width: (isNotice || isPopular) ? 1.4 : 1,
+        ),
+      ),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => DetailPage(postId: doc.id)),
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  if (isNotice)
-                    const _MiniBadge(label: '공지', color: AppTheme.primary)
-                  else if (isPopular)
-                    const _MiniBadge(label: '인기', color: AppTheme.teal),
-                  if (isNotice || isPopular) const Spacer(),
-                  const Icon(
-                    Icons.favorite_border_rounded,
-                    size: 17,
-                    color: AppTheme.muted,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '$likes',
-                    style: const TextStyle(
-                      color: AppTheme.muted,
-                      fontWeight: FontWeight.w700,
+              if (isNotice || isPopular)
+                Container(
+                  width: 5,
+                  decoration: BoxDecoration(
+                    color: highlightColor,
+                    borderRadius: BorderRadius.horizontal(
+                      left: Radius.circular(16),
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Text(
-                (data['title'] ?? '').toString(),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: AppTheme.ink,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
                 ),
-              ),
-              const SizedBox(height: 5),
-              Text(
-                (data['content'] ?? '').toString(),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: AppTheme.muted, height: 1.35),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          if (isNotice)
+                            const _MiniBadge(
+                              label: '공지',
+                              color: AppTheme.primary,
+                              icon: Icons.campaign_rounded,
+                              filled: true,
+                            )
+                          else if (isPopular)
+                            const _MiniBadge(
+                              label: '인기',
+                              color: AppTheme.teal,
+                              icon: Icons.local_fire_department_rounded,
+                              filled: true,
+                            ),
+                          if (isNotice || isPopular) const Spacer(),
+                          const Icon(
+                            Icons.favorite_border_rounded,
+                            size: 17,
+                            color: AppTheme.muted,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '$likes',
+                            style: const TextStyle(
+                              color: AppTheme.muted,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        (data['title'] ?? '').toString(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: isNotice
+                              ? AppTheme.primary
+                              : (isPopular ? AppTheme.teal : AppTheme.ink),
+                          fontSize: 16,
+                          fontWeight: (isNotice || isPopular)
+                              ? FontWeight.w900
+                              : FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        (data['content'] ?? '').toString(),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppTheme.muted,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),
@@ -510,12 +630,13 @@ class _ProfileTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final userId = SessionService.currentUserId ?? 'Guest';
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: board.watchAllPosts(),
+      stream: board.watchUserPosts(userId),
       builder: (context, snapshot) {
         final docs = snapshot.data?.docs ?? [];
-        final myPosts =
-            docs.where((doc) => doc.data()['authorId'] == userId).toList()
-              ..sort((a, b) => BoardService.compareByTime(a.data(), b.data()));
+        final myPosts = docs
+            .where((doc) => !BoardService.isDeleted(doc.data()))
+            .toList()
+          ..sort((a, b) => BoardService.compareByTime(a.data(), b.data()));
         final likeCount = myPosts.fold<int>(
           0,
           (total, doc) => total + ((doc.data()['likes'] as num?)?.toInt() ?? 0),
@@ -607,6 +728,19 @@ class _ProfileTab extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
+            if (SessionService.isAdmin) ...[
+              OutlinedButton.icon(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => _ReportInboxPage(board: board),
+                  ),
+                ),
+                icon: const Icon(Icons.flag_outlined),
+                label: const Text('신고함 확인'),
+              ),
+              const SizedBox(height: 12),
+            ],
             OutlinedButton.icon(
               onPressed: () async {
                 await SessionService.clear();
@@ -677,46 +811,18 @@ class _ScheduleTab extends StatelessWidget {
             message: '관리자 계정에서 일정을 추가할 수 있습니다.',
           );
         }
-        return ListView.separated(
+        return ListView.builder(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
-          itemCount: docs.length,
-          separatorBuilder: (_, _) => const SizedBox(height: 10),
+          itemCount: docs.length + 1,
           itemBuilder: (context, index) {
-            final doc = docs[index];
-            final data = doc.data();
-            return Card(
-              child: ListTile(
-                contentPadding: const EdgeInsets.all(16),
-                leading: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF3F4F6),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    (data['time'] ?? '').toString(),
-                    style: const TextStyle(
-                      color: AppTheme.ink,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-                title: Text(
-                  (data['title'] ?? '').toString(),
-                  style: const TextStyle(fontWeight: FontWeight.w800),
-                ),
-                subtitle: Text((data['location'] ?? '').toString()),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ScheduleDetailPage(scheduleId: doc.id),
-                  ),
-                ),
-              ),
+            if (index == 0) {
+              return const _ScheduleNoticeHeader();
+            }
+
+            final doc = docs[index - 1];
+            return Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: _ScheduleAlertCard(doc: doc),
             );
           },
         );
@@ -725,27 +831,495 @@ class _ScheduleTab extends StatelessWidget {
   }
 }
 
+class _ScheduleNoticeHeader extends StatelessWidget {
+  const _ScheduleNoticeHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEEF6FF),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF7FB3E8)),
+      ),
+      child: const Row(
+        children: [
+          CircleAvatar(
+            radius: 22,
+            backgroundColor: Color(0xFF0F6CBD),
+            child: Icon(Icons.campaign_rounded, color: Colors.white),
+          ),
+          SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '학교 주요 알림',
+                  style: TextStyle(
+                    color: Color(0xFF0B3D66),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  '행사 시간, 장소, 변경사항을 먼저 확인하세요.',
+                  style: TextStyle(color: Color(0xFF4B6478), height: 1.35),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ScheduleAlertCard extends StatelessWidget {
+  const _ScheduleAlertCard({required this.doc});
+
+  final QueryDocumentSnapshot<Map<String, dynamic>> doc;
+
+  @override
+  Widget build(BuildContext context) {
+    final data = doc.data();
+    final time = (data['time'] ?? '').toString();
+    final title = (data['title'] ?? '').toString();
+    final location = (data['location'] ?? '').toString();
+    final description = (data['description'] ?? '').toString();
+
+    return Material(
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: Color(0xFFD8E7F3)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ScheduleDetailPage(scheduleId: doc.id),
+          ),
+        ),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(width: 6, color: const Color(0xFF0F6CBD)),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0F6CBD),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              time,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                          const Spacer(),
+                          const Icon(
+                            Icons.chevron_right_rounded,
+                            color: AppTheme.muted,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppTheme.ink,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      if (location.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.place_outlined,
+                              size: 17,
+                              color: Color(0xFF0F6CBD),
+                            ),
+                            const SizedBox(width: 5),
+                            Expanded(
+                              child: Text(
+                                location,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: AppTheme.muted,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                      if (description.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          description,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFF4B5563),
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ReportInboxPage extends StatelessWidget {
+  const _ReportInboxPage({required this.board});
+
+  final BoardService board;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!SessionService.isAdmin) {
+      return const Scaffold(
+        body: Center(child: Text('관리자만 확인할 수 있습니다.')),
+      );
+    }
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('신고함')),
+      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: board.watchReports(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return EmptyState(
+              icon: Icons.lock_outline_rounded,
+              title: '신고함을 불러오지 못했습니다',
+              message:
+                  'Firestore reports 읽기 권한을 확인해 주세요.\n${snapshot.error}',
+            );
+          }
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final reports = snapshot.data!.docs.toList()
+            ..sort(BoardService.compareReports);
+          if (reports.isEmpty) {
+            return const EmptyState(
+              icon: Icons.flag_outlined,
+              title: '접수된 신고가 없습니다',
+              message: '게시글 또는 댓글 신고가 들어오면 이곳에 표시됩니다.',
+            );
+          }
+
+          final pendingCount = reports
+              .where((doc) => (doc.data()['status'] ?? 'pending') != 'resolved')
+              .length;
+
+          return ListView.builder(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+            itemCount: reports.length + 1,
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return _ReportInboxHeader(
+                  totalCount: reports.length,
+                  pendingCount: pendingCount,
+                );
+              }
+
+              return Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: _ReportCard(board: board, doc: reports[index - 1]),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ReportInboxHeader extends StatelessWidget {
+  const _ReportInboxHeader({
+    required this.totalCount,
+    required this.pendingCount,
+  });
+
+  final int totalCount;
+  final int pendingCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF3F6),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: const Color(0xFFFFD3DD)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 54,
+            height: 54,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppTheme.primary,
+            ),
+            child: const Icon(Icons.flag_rounded, color: Colors.white),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '신고함',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: AppTheme.ink,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '대기 $pendingCount건 · 전체 $totalCount건',
+                  style: const TextStyle(
+                    color: AppTheme.muted,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReportCard extends StatelessWidget {
+  const _ReportCard({required this.board, required this.doc});
+
+  final BoardService board;
+  final QueryDocumentSnapshot<Map<String, dynamic>> doc;
+
+  @override
+  Widget build(BuildContext context) {
+    final data = doc.data();
+    final status = (data['status'] ?? 'pending').toString();
+    final targetType = (data['targetType'] ?? '').toString();
+    final targetId = (data['targetId'] ?? '').toString();
+    final postId = targetId.split(':').first;
+    final canOpenTarget = targetType == 'post' || targetType == 'comment';
+
+    return Material(
+      color: Colors.white,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(26),
+        side: const BorderSide(color: Color(0xFFF0F0F2)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                _MiniBadge(
+                  label: status == 'resolved' ? '처리됨' : '대기',
+                  color: status == 'resolved' ? AppTheme.teal : AppTheme.primary,
+                  icon: status == 'resolved'
+                      ? Icons.check_rounded
+                      : Icons.flag_outlined,
+                  filled: true,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _targetTypeLabel(targetType),
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppTheme.muted,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              (data['targetTitle'] ?? '제목 없음').toString(),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '신고자: ${(data['reporterId'] ?? '').toString()}',
+              style: const TextStyle(color: AppTheme.muted),
+            ),
+            Text(
+              '사유: ${_reasonLabel((data['reason'] ?? '').toString())}',
+              style: const TextStyle(color: AppTheme.muted),
+            ),
+            finalDetail(data),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (canOpenTarget && postId.isNotEmpty)
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => DetailPage(postId: postId),
+                      ),
+                    ),
+                    icon: const Icon(Icons.open_in_new_rounded),
+                    label: const Text('대상 열기'),
+                  ),
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                  onPressed: status == 'resolved'
+                      ? null
+                      : () => _markResolved(context),
+                  icon: const Icon(Icons.check_rounded),
+                  label: const Text('처리 완료'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget finalDetail(Map<String, dynamic> data) {
+    final detail = (data['detail'] ?? '').toString();
+    if (detail.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Text(
+        detail,
+        maxLines: 3,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(height: 1.45),
+      ),
+    );
+  }
+
+  Future<void> _markResolved(BuildContext context) async {
+    try {
+      await board.updateReportStatus(reportId: doc.id, status: 'resolved');
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text('신고 상태를 바꾸지 못했습니다: $e')));
+    }
+  }
+
+  String _targetTypeLabel(String value) {
+    return switch (value) {
+      'post' => '게시글 신고',
+      'comment' => '댓글 신고',
+      'user' => '작성자 신고',
+      _ => '신고',
+    };
+  }
+
+  String _reasonLabel(String value) {
+    return switch (value) {
+      'harassment' => '욕설/비방/괴롭힘',
+      'privacy' => '개인정보 노출',
+      'sexual' => '음란/선정적 내용',
+      'violence' => '폭력/위협/자해 조장',
+      'spam' => '스팸/광고/도배',
+      'impersonation' => '사칭/허위정보',
+      'other' => '기타',
+      _ => value.isEmpty ? '미지정' : value,
+    };
+  }
+}
+
 class _MiniBadge extends StatelessWidget {
-  const _MiniBadge({required this.label, required this.color});
+  const _MiniBadge({
+    required this.label,
+    required this.color,
+    this.icon,
+    this.filled = false,
+  });
 
   final String label;
   final Color color;
+  final IconData? icon;
+  final bool filled;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: filled ? color : color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(999),
       ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontSize: 12,
-          fontWeight: FontWeight.w800,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 13, color: filled ? Colors.white : color),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            label,
+            style: TextStyle(
+              color: filled ? Colors.white : color,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:central_festival_app/src/services/board_service.dart';
 import 'package:central_festival_app/src/services/session_service.dart';
 import 'package:central_festival_app/src/theme/app_theme.dart';
@@ -5,7 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-enum _PostAction { reportPost, reportAuthor, blockAuthor }
+enum _PostAction { reportPost, reportAuthor, blockAuthor, deletePost }
 
 class DetailPage extends StatefulWidget {
   const DetailPage({super.key, required this.postId});
@@ -22,6 +24,7 @@ class _DetailPageState extends State<DetailPage> {
   bool _commenting = false;
   bool _liking = false;
   bool _reporting = false;
+  bool _deleting = false;
 
   @override
   void dispose() {
@@ -117,6 +120,40 @@ class _DetailPageState extends State<DetailPage> {
     _message('이 작성자의 게시글과 댓글을 숨겼습니다.');
   }
 
+  Future<void> _deletePost(String title) async {
+    if (_deleting) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('게시글 삭제'),
+        content: Text('「$title」 게시글을 삭제할까요?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('삭제'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _deleting = true);
+    try {
+      await _board.deletePost(widget.postId);
+      if (!mounted) return;
+      Navigator.pop(context);
+    } catch (e) {
+      if (mounted) _message('게시글을 삭제하지 못했습니다: $e');
+    } finally {
+      if (mounted) setState(() => _deleting = false);
+    }
+  }
+
   void _message(String value) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -141,11 +178,17 @@ class _DetailPageState extends State<DetailPage> {
           }
 
           final data = snapshot.data!.data() ?? {};
+          if (BoardService.isDeleted(data)) {
+            return const Center(child: Text('게시글이 삭제되었습니다.'));
+          }
           final comments = _readComments(data['comments']);
           final likedBy = List<String>.from(data['likedBy'] ?? []);
           final userId = SessionService.currentUserId;
           final authorId = (data['authorId'] ?? '').toString();
           final title = (data['title'] ?? '').toString();
+          final canDelete =
+              SessionService.isAdmin ||
+              (userId != null && userId.isNotEmpty && userId == authorId);
           final visibleComments = comments.where((comment) {
             final author = (comment['author'] ?? '').toString();
             return author.isEmpty || !SessionService.isBlocked(author);
@@ -200,7 +243,7 @@ class _DetailPageState extends State<DetailPage> {
                         ),
                         PopupMenuButton<_PostAction>(
                           tooltip: '게시글 메뉴',
-                          enabled: !_reporting,
+                          enabled: !_reporting && !_deleting,
                           onSelected: (action) {
                             switch (action) {
                               case _PostAction.reportPost:
@@ -221,6 +264,9 @@ class _DetailPageState extends State<DetailPage> {
                                 break;
                               case _PostAction.blockAuthor:
                                 _blockAuthor(authorId);
+                                break;
+                              case _PostAction.deletePost:
+                                _deletePost(title);
                                 break;
                             }
                           },
@@ -251,19 +297,24 @@ class _DetailPageState extends State<DetailPage> {
                                 ),
                               ),
                             ],
+                            if (canDelete)
+                              const PopupMenuItem(
+                                value: _PostAction.deletePost,
+                                child: ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: Icon(Icons.delete_outline_rounded),
+                                  title: Text('게시글 삭제'),
+                                ),
+                              ),
                           ],
                         ),
                       ],
                     ),
                     const SizedBox(height: 22),
-                    if ((data['imageUrl'] ?? '').toString().isNotEmpty) ...[
+                    if (_hasPostImage(data)) ...[
                       ClipRRect(
                         borderRadius: BorderRadius.circular(16),
-                        child: Image.network(
-                          data['imageUrl'].toString(),
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => const EmptyImageState(),
-                        ),
+                        child: _PostImage(data: data),
                       ),
                       const SizedBox(height: 22),
                     ],
@@ -363,6 +414,8 @@ class _DetailPageState extends State<DetailPage> {
                                   case _PostAction.blockAuthor:
                                     _blockAuthor(commentAuthor);
                                     break;
+                                  case _PostAction.deletePost:
+                                    break;
                                 }
                               },
                               itemBuilder: (context) {
@@ -455,9 +508,38 @@ class _DetailPageState extends State<DetailPage> {
         .toList();
   }
 
+  bool _hasPostImage(Map<String, dynamic> data) {
+    return (data['imageUrl'] ?? '').toString().isNotEmpty ||
+        (data['imageData'] ?? '').toString().isNotEmpty;
+  }
+
   String _formatTime(dynamic value) {
     if (value is! Timestamp) return '';
     return DateFormat('M/d HH:mm').format(value.toDate());
+  }
+}
+
+class _PostImage extends StatelessWidget {
+  const _PostImage({required this.data});
+
+  final Map<String, dynamic> data;
+
+  @override
+  Widget build(BuildContext context) {
+    final imageData = (data['imageData'] ?? '').toString();
+    if (imageData.isNotEmpty) {
+      try {
+        return Image.memory(base64Decode(imageData), fit: BoxFit.cover);
+      } catch (_) {
+        return const EmptyImageState();
+      }
+    }
+
+    return Image.network(
+      (data['imageUrl'] ?? '').toString(),
+      fit: BoxFit.cover,
+      errorBuilder: (_, _, _) => const EmptyImageState(),
+    );
   }
 }
 

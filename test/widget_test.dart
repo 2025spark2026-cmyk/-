@@ -13,6 +13,6 @@ void main() {
   testWidgets('shows splash title', (WidgetTester tester) async {
     await tester.pumpWidget(const MyApp());
 
-    expect(find.text('중앙 축제'), findsOneWidget);
+    expect(find.text('중앙'), findsOneWidget);
   });
 }

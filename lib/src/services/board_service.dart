@@ -1,17 +1,16 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 
 class BoardService {
-  BoardService({FirebaseFirestore? firestore, FirebaseStorage? storage})
-    : _firestore = firestore ?? FirebaseFirestore.instance,
-      _storage = storage ?? FirebaseStorage.instance;
+  BoardService({FirebaseFirestore? firestore})
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   static const popularLikeThreshold = 10;
+  static const maxInlineImageBytes = 450 * 1024;
 
   final FirebaseFirestore _firestore;
-  final FirebaseStorage _storage;
 
   CollectionReference<Map<String, dynamic>> get _posts =>
       _firestore.collection('posts');
@@ -20,12 +19,23 @@ class BoardService {
       _firestore.collection('reports');
 
   Stream<QuerySnapshot<Map<String, dynamic>>> watchPosts() {
-    // 복합 인덱스 없이 동작하도록 서버 정렬은 피하고 화면에서 정렬한다.
-    return _posts.snapshots();
+    return _posts.orderBy('timestamp', descending: true).limit(200).snapshots();
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> watchAllPosts() {
     return _posts.snapshots();
+  }
+
+  Stream<QuerySnapshot<Map<String, dynamic>>> watchPopularPosts() {
+    return _posts.orderBy('likes', descending: true).limit(100).snapshots();
+  }
+
+  Stream<QuerySnapshot<Map<String, dynamic>>> watchUserPosts(String userId) {
+    return _posts.where('authorId', isEqualTo: userId).limit(50).snapshots();
+  }
+
+  Stream<QuerySnapshot<Map<String, dynamic>>> watchReports() {
+    return _reports.limit(100).snapshots();
   }
 
   Stream<DocumentSnapshot<Map<String, dynamic>>> watchPost(String id) {
@@ -38,7 +48,8 @@ class BoardService {
         .limit(20)
         .get();
     final docs = result.docs..sort(comparePosts);
-    return docs.isEmpty ? null : docs.first;
+    final visibleDocs = docs.where((doc) => !isDeleted(doc.data())).toList();
+    return visibleDocs.isEmpty ? null : visibleDocs.first;
   }
 
   Future<String> createPost({
@@ -52,24 +63,23 @@ class BoardService {
     String? imageContentType,
   }) async {
     var imageUrl = '';
+    var imageData = '';
+    final contentType = imageContentType ?? _contentTypeFor(
+      _safeExtension(imageExtension),
+    );
     if (imageBytes != null && imageBytes.isNotEmpty) {
-      final extension = _safeExtension(imageExtension);
-      final path = 'posts/${DateTime.now().millisecondsSinceEpoch}.$extension';
-      final ref = _storage.ref(path);
-
-      await ref.putData(
-        imageBytes,
-        SettableMetadata(
-          contentType: imageContentType ?? _contentTypeFor(extension),
-        ),
-      );
-      imageUrl = await ref.getDownloadURL();
+      if (imageBytes.length > maxInlineImageBytes) {
+        throw const ImageTooLargeException();
+      }
+      imageData = base64Encode(imageBytes);
     }
 
     final doc = await _posts.add({
       'title': title,
       'content': content,
       'imageUrl': imageUrl,
+      'imageData': imageData,
+      'imageContentType': imageData.isEmpty ? '' : contentType,
       'authorName': notice ? '학생회' : (anonymous ? '익명' : authorId),
       'authorId': authorId,
       'isNotice': notice,
@@ -106,6 +116,21 @@ class BoardService {
     });
   }
 
+  Future<void> deletePost(String postId) {
+    return _posts.doc(postId).update({
+      'isDeleted': true,
+      'deletedAt': FieldValue.serverTimestamp(),
+      'title': '삭제된 게시글',
+      'content': '',
+      'imageUrl': '',
+      'imageData': '',
+      'imageContentType': '',
+      'comments': <Map<String, dynamic>>[],
+      'likedBy': <String>[],
+      'likes': 0,
+    });
+  }
+
   Future<void> submitReport({
     required String targetType,
     required String targetId,
@@ -128,6 +153,16 @@ class BoardService {
     });
   }
 
+  Future<void> updateReportStatus({
+    required String reportId,
+    required String status,
+  }) {
+    return _reports.doc(reportId).update({
+      'status': status,
+      'reviewedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
   static int comparePosts(
     QueryDocumentSnapshot<Map<String, dynamic>> a,
     QueryDocumentSnapshot<Map<String, dynamic>> b,
@@ -140,9 +175,30 @@ class BoardService {
     return compareByTime(aData, bData);
   }
 
+  static bool isDeleted(Map<String, dynamic> data) {
+    return data['isDeleted'] == true;
+  }
+
   static int compareByTime(Map<String, dynamic> a, Map<String, dynamic> b) {
     final aTime = a['timestamp'];
     final bTime = b['timestamp'];
+    final aMillis = aTime is Timestamp ? aTime.millisecondsSinceEpoch : 0;
+    final bMillis = bTime is Timestamp ? bTime.millisecondsSinceEpoch : 0;
+    return bMillis.compareTo(aMillis);
+  }
+
+  static int compareReports(
+    QueryDocumentSnapshot<Map<String, dynamic>> a,
+    QueryDocumentSnapshot<Map<String, dynamic>> b,
+  ) {
+    final aData = a.data();
+    final bData = b.data();
+    final aPending = (aData['status'] ?? 'pending') != 'resolved';
+    final bPending = (bData['status'] ?? 'pending') != 'resolved';
+    if (aPending != bPending) return aPending ? -1 : 1;
+
+    final aTime = aData['createdAt'];
+    final bTime = bData['createdAt'];
     final aMillis = aTime is Timestamp ? aTime.millisecondsSinceEpoch : 0;
     final bMillis = bTime is Timestamp ? bTime.millisecondsSinceEpoch : 0;
     return bMillis.compareTo(aMillis);
@@ -164,4 +220,11 @@ class BoardService {
       _ => 'image/jpeg',
     };
   }
+}
+
+class ImageTooLargeException implements Exception {
+  const ImageTooLargeException();
+
+  @override
+  String toString() => '사진 용량이 너무 큽니다. 더 작은 사진을 선택해 주세요.';
 }
