@@ -772,27 +772,33 @@ class _ProfileActions extends StatelessWidget {
       runSpacing: 8,
       children: [
         if (SessionService.isAdmin)
-          _ProfilePillButton(
-            icon: Icons.flag_outlined,
-            label: '신고함',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => _ReportInboxPage(board: board),
+          SizedBox(
+            width: 126,
+            child: _ProfilePillButton(
+              icon: Icons.flag_outlined,
+              label: '신고함',
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => _ReportInboxPage(board: board),
+                ),
               ),
             ),
           ),
-        _ProfilePillButton(
-          icon: Icons.logout_rounded,
-          label: '로그아웃',
-          onPressed: () async {
-            await SessionService.clear();
-            if (!context.mounted) return;
-            Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(builder: (_) => const auth.LoginPage()),
-              (_) => false,
-            );
-          },
+        SizedBox(
+          width: SessionService.isAdmin ? 126 : 160,
+          child: _ProfilePillButton(
+            icon: Icons.logout_rounded,
+            label: '로그아웃',
+            onPressed: () async {
+              await SessionService.clear();
+              if (!context.mounted) return;
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const auth.LoginPage()),
+                (_) => false,
+              );
+            },
+          ),
         ),
       ],
     );
@@ -814,18 +820,17 @@ class _ProfilePillButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return OutlinedButton.icon(
       style: OutlinedButton.styleFrom(
-        minimumSize: const Size(0, 38),
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        visualDensity: VisualDensity.compact,
+        minimumSize: const Size.fromHeight(44),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(999),
         ),
       ),
       onPressed: onPressed,
-      icon: Icon(icon, size: 17),
+      icon: Icon(icon, size: 18),
       label: Text(
         label,
-        style: const TextStyle(fontWeight: FontWeight.w800),
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
       ),
     );
   }
