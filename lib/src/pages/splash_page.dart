@@ -41,7 +41,7 @@ class _SplashPageState extends State<SplashPage> {
             Icon(Icons.festival_rounded, size: 92, color: Colors.white),
             SizedBox(height: 18),
             Text(
-              '중앙 축제',
+              '중앙',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 34,
@@ -49,10 +49,7 @@ class _SplashPageState extends State<SplashPage> {
               ),
             ),
             SizedBox(height: 8),
-            Text(
-              '우리 학교 축제의 모든 것',
-              style: TextStyle(color: Colors.white70, fontSize: 15),
-            ),
+            Text('test', style: TextStyle(color: Colors.white70, fontSize: 15)),
           ],
         ),
       ),

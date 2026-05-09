@@ -16,6 +16,9 @@ class BoardService {
   CollectionReference<Map<String, dynamic>> get _posts =>
       _firestore.collection('posts');
 
+  CollectionReference<Map<String, dynamic>> get _reports =>
+      _firestore.collection('reports');
+
   Stream<QuerySnapshot<Map<String, dynamic>>> watchPosts() {
     // 복합 인덱스 없이 동작하도록 서버 정렬은 피하고 화면에서 정렬한다.
     return _posts.snapshots();
@@ -100,6 +103,28 @@ class BoardService {
           ? FieldValue.arrayRemove([userId])
           : FieldValue.arrayUnion([userId]),
       'likes': FieldValue.increment(currentlyLiked ? -1 : 1),
+    });
+  }
+
+  Future<void> submitReport({
+    required String targetType,
+    required String targetId,
+    required String reporterId,
+    required String reason,
+    required String detail,
+    String? targetOwnerId,
+    String? targetTitle,
+  }) {
+    return _reports.add({
+      'targetType': targetType,
+      'targetId': targetId,
+      'targetOwnerId': targetOwnerId ?? '',
+      'targetTitle': targetTitle ?? '',
+      'reporterId': reporterId,
+      'reason': reason,
+      'detail': detail,
+      'status': 'pending',
+      'createdAt': FieldValue.serverTimestamp(),
     });
   }
 

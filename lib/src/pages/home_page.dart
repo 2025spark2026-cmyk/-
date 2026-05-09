@@ -243,7 +243,15 @@ class _BoardTab extends StatelessWidget {
           return const Center(child: CircularProgressIndicator());
         }
 
-        final docs = snapshot.data!.docs..sort(BoardService.comparePosts);
+        final docs =
+            snapshot.data!.docs
+                .where(
+                  (doc) => !SessionService.isBlocked(
+                    (doc.data()['authorId'] ?? '').toString(),
+                  ),
+                )
+                .toList()
+              ..sort(BoardService.comparePosts);
         if (docs.isEmpty) {
           return const EmptyState(
             icon: Icons.forum_outlined,
@@ -286,6 +294,9 @@ class _PopularTab extends StatelessWidget {
 
         final docs = snapshot.data!.docs.where((doc) {
           final data = doc.data();
+          if (SessionService.isBlocked((data['authorId'] ?? '').toString())) {
+            return false;
+          }
           final likes = (data['likes'] as num?)?.toInt() ?? 0;
           return data['isNotice'] != true &&
               likes >= BoardService.popularLikeThreshold;

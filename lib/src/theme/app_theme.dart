@@ -2,7 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  static const primary = Color(0xFF007AFF);
+  static const primary = Color(0xFFA50034);
   static const danger = Color(0xFFFF3B30);
   static const ink = Color(0xFF111827);
   static const muted = Color(0xFF6B7280);
