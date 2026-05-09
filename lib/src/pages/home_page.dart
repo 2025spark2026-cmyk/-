@@ -699,6 +699,8 @@ class _ProfileTab extends StatelessWidget {
                         _ProfileStat(label: '댓글', value: '$commentCount'),
                       ],
                     ),
+                    const SizedBox(height: 18),
+                    _ProfileActions(board: board),
                   ],
                 ),
               ),
@@ -728,32 +730,6 @@ class _ProfileTab extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            if (SessionService.isAdmin) ...[
-              OutlinedButton.icon(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => _ReportInboxPage(board: board),
-                  ),
-                ),
-                icon: const Icon(Icons.flag_outlined),
-                label: const Text('신고함 확인'),
-              ),
-              const SizedBox(height: 12),
-            ],
-            OutlinedButton.icon(
-              onPressed: () async {
-                await SessionService.clear();
-                if (!context.mounted) return;
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (_) => const auth.LoginPage()),
-                  (_) => false,
-                );
-              },
-              icon: const Icon(Icons.logout_rounded),
-              label: const Text('로그아웃'),
-            ),
-            const SizedBox(height: 24),
             const Text(
               '내가 쓴 글',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
@@ -779,6 +755,78 @@ class _ProfileTab extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+class _ProfileActions extends StatelessWidget {
+  const _ProfileActions({required this.board});
+
+  final BoardService board;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        if (SessionService.isAdmin)
+          _ProfilePillButton(
+            icon: Icons.flag_outlined,
+            label: '신고함',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => _ReportInboxPage(board: board),
+              ),
+            ),
+          ),
+        _ProfilePillButton(
+          icon: Icons.logout_rounded,
+          label: '로그아웃',
+          onPressed: () async {
+            await SessionService.clear();
+            if (!context.mounted) return;
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const auth.LoginPage()),
+              (_) => false,
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _ProfilePillButton extends StatelessWidget {
+  const _ProfilePillButton({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(0, 38),
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        visualDensity: VisualDensity.compact,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(999),
+        ),
+      ),
+      onPressed: onPressed,
+      icon: Icon(icon, size: 17),
+      label: Text(
+        label,
+        style: const TextStyle(fontWeight: FontWeight.w800),
+      ),
     );
   }
 }
